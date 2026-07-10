@@ -3,6 +3,105 @@ namespace QuickSearch.Core.Tests;
 public sealed class SettingsViewModelTests
 {
     [Fact]
+    public void BeginEdit_GroupsFlatMappingsByCaseInsensitiveFolderPath()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("你好", @"D:\资料\Greeting");
+        configuration.AddMapping("今天好", @"d:\资料\greeting");
+        configuration.AddMapping("hello", @"D:\资料\Greeting");
+
+        var viewModel = CreateViewModel(configuration, new FakeMappingStore());
+
+        var group = Assert.Single(viewModel.MappingGroups);
+        Assert.Equal("你好， 今天好， hello", group.KeywordsText);
+        Assert.Equal(@"D:\资料\Greeting", group.FolderPath);
+    }
+
+    [Fact]
+    public void MappingFilter_MatchesKeywordsAndPathsAndReportsCounts()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("sales", @"C:\Clients\Sales");
+        configuration.AddMapping("support", @"D:\Teams\Support");
+        var viewModel = CreateViewModel(configuration, new FakeMappingStore());
+
+        viewModel.MappingFilter = "support";
+
+        Assert.Single(viewModel.FilteredMappingGroups);
+        Assert.Equal(@"D:\Teams\Support", viewModel.FilteredMappingGroups[0].FolderPath);
+        Assert.Equal("当前显示 1 条 / 共 2 条", viewModel.MappingCountText);
+
+        viewModel.MappingFilter = "clients";
+        Assert.Equal(@"C:\Clients\Sales", Assert.Single(viewModel.FilteredMappingGroups).FolderPath);
+    }
+
+    [Fact]
+    public void MappingFilter_HandlesTwoHundredGroupsWithoutChangingSource()
+    {
+        var configuration = new AppConfiguration();
+        for (var index = 0; index < 200; index++)
+        {
+            configuration.AddMapping($"keyword-{index}", $@"C:\Folders\Folder-{index}");
+        }
+
+        var viewModel = CreateViewModel(configuration, new FakeMappingStore());
+        viewModel.MappingFilter = "keyword-199";
+
+        Assert.Equal(200, viewModel.MappingGroups.Count);
+        Assert.Single(viewModel.FilteredMappingGroups);
+        Assert.Equal("当前显示 1 条 / 共 200 条", viewModel.MappingCountText);
+    }
+
+    [Fact]
+    public void AddMapping_InsertsBlankGroupAtTopAndSelectsIt()
+    {
+        var viewModel = CreateViewModel(
+            CreateConfiguration(),
+            new FakeMappingStore());
+
+        viewModel.AddMapping();
+
+        Assert.Same(viewModel.MappingGroups[0], viewModel.SelectedMappingGroup);
+        Assert.Equal(string.Empty, viewModel.MappingGroups[0].KeywordsText);
+        Assert.Equal(string.Empty, viewModel.MappingGroups[0].FolderPath);
+    }
+
+    [Fact]
+    public void DeleteSelectedMapping_RemovesSourceGroupWhileFiltered()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("sales", @"C:\Sales");
+        configuration.AddMapping("support", @"D:\Support");
+        var viewModel = CreateViewModel(configuration, new FakeMappingStore());
+        viewModel.MappingFilter = "support";
+        viewModel.SelectedMappingGroup = Assert.Single(viewModel.FilteredMappingGroups);
+
+        viewModel.DeleteSelectedMapping();
+
+        Assert.Single(viewModel.MappingGroups);
+        Assert.Equal("sales", viewModel.MappingGroups[0].KeywordsText);
+    }
+
+    [Fact]
+    public async Task SaveAsync_ExpandsCommaSeparatedKeywordsToFlatMappings()
+    {
+        var configuration = new AppConfiguration();
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.AddMapping();
+        viewModel.MappingGroups[0].KeywordsText = "你好，今天好, hello；HELLO";
+        viewModel.MappingGroups[0].FolderPath = @"D:\资料\Greeting";
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal(3, configuration.GetMappingsForPath(@"d:\资料\greeting").Count);
+        Assert.Equal(
+            ["你好", "今天好", "hello"],
+            configuration.GetMappingsForPath(@"D:\资料\Greeting").Select(mapping => mapping.Alias));
+        Assert.Equal(1, store.SaveCalls);
+    }
+
+    [Fact]
     public void Cancel_DiscardsAllPendingSettingsAndMappingChanges()
     {
         var configuration = CreateConfiguration();
@@ -61,8 +160,8 @@ public sealed class SettingsViewModelTests
         viewModel.SelectedMapping = viewModel.Mappings.Single(mapping => mapping.Alias == "support");
         viewModel.DeleteSelectedMapping();
         viewModel.AddMapping();
-        viewModel.Mappings[^1].Alias = "finance";
-        viewModel.Mappings[^1].FolderPath = "/finance";
+        viewModel.SelectedMappingGroup!.Alias = "finance";
+        viewModel.SelectedMappingGroup.FolderPath = "/finance";
 
         await viewModel.SaveAsync();
 
@@ -79,8 +178,8 @@ public sealed class SettingsViewModelTests
         var store = new FakeMappingStore();
         var viewModel = CreateViewModel(configuration, store);
         viewModel.AddMapping();
-        viewModel.Mappings[^1].Alias = " SALES ";
-        viewModel.Mappings[^1].FolderPath = "/sales-archive";
+        viewModel.SelectedMappingGroup!.Alias = " SALES ";
+        viewModel.SelectedMappingGroup.FolderPath = "/sales-archive";
 
         await viewModel.SaveAsync();
 
@@ -96,8 +195,8 @@ public sealed class SettingsViewModelTests
         var store = new FakeMappingStore();
         var viewModel = CreateViewModel(configuration, store);
         viewModel.AddMapping();
-        viewModel.Mappings[^1].Alias = " SALES ";
-        viewModel.Mappings[^1].FolderPath = "/SALES";
+        viewModel.SelectedMappingGroup!.Alias = " SALES ";
+        viewModel.SelectedMappingGroup.FolderPath = "/SALES";
 
         await viewModel.SaveAsync();
 

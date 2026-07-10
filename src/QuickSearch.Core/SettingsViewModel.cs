@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace QuickSearch.Core;
 
@@ -14,7 +15,9 @@ public sealed class SettingsViewModel : ObservableObject
     private string _everythingHealthText = string.Empty;
     private EverythingHealth _everythingHealth;
     private string _message = string.Empty;
-    private MappingEditorViewModel? _selectedMapping;
+    private string _mappingFilter = string.Empty;
+    private IReadOnlyList<MappingGroupEditorViewModel> _filteredMappingGroups = [];
+    private MappingGroupEditorViewModel? _selectedMappingGroup;
     private bool _isSaving;
 
     public SettingsViewModel(
@@ -51,7 +54,36 @@ public sealed class SettingsViewModel : ObservableObject
 
     public event EventHandler? Saved;
 
-    public ObservableCollection<MappingEditorViewModel> Mappings { get; } = [];
+    public ObservableCollection<MappingGroupEditorViewModel> MappingGroups { get; } = [];
+
+    public ObservableCollection<MappingGroupEditorViewModel> Mappings => MappingGroups;
+
+    public IReadOnlyList<MappingGroupEditorViewModel> FilteredMappingGroups
+    {
+        get => _filteredMappingGroups;
+        private set
+        {
+            if (SetProperty(ref _filteredMappingGroups, value))
+            {
+                OnPropertyChanged(nameof(MappingCountText));
+            }
+        }
+    }
+
+    public string MappingFilter
+    {
+        get => _mappingFilter;
+        set
+        {
+            if (SetProperty(ref _mappingFilter, value ?? string.Empty))
+            {
+                RefreshFilteredMappingGroups();
+            }
+        }
+    }
+
+    public string MappingCountText =>
+        $"当前显示 {FilteredMappingGroups.Count} 条 / 共 {MappingGroups.Count} 条";
 
     public string Shortcut
     {
@@ -83,16 +115,23 @@ public sealed class SettingsViewModel : ObservableObject
         private set => SetProperty(ref _message, value);
     }
 
-    public MappingEditorViewModel? SelectedMapping
+    public MappingGroupEditorViewModel? SelectedMappingGroup
     {
-        get => _selectedMapping;
+        get => _selectedMappingGroup;
         set
         {
-            if (SetProperty(ref _selectedMapping, value))
+            if (SetProperty(ref _selectedMappingGroup, value))
             {
+                OnPropertyChanged(nameof(SelectedMapping));
                 DeleteMappingCommand.NotifyCanExecuteChanged();
             }
         }
+    }
+
+    public MappingGroupEditorViewModel? SelectedMapping
+    {
+        get => SelectedMappingGroup;
+        set => SelectedMappingGroup = value;
     }
 
     public bool IsSaving
@@ -119,16 +158,35 @@ public sealed class SettingsViewModel : ObservableObject
     {
         Shortcut = _configuration.Settings.GlobalShortcut;
         StartWithWindows = _configuration.Settings.StartWithWindows;
-        Mappings.Clear();
-        foreach (var mapping in _configuration.Mappings.OrderBy(
-                     mapping => mapping.Alias,
-                     StringComparer.CurrentCultureIgnoreCase))
+        foreach (var group in MappingGroups)
         {
-            Mappings.Add(new MappingEditorViewModel(mapping));
+            group.PropertyChanged -= MappingGroup_PropertyChanged;
         }
 
-        SelectedMapping = null;
+        MappingGroups.Clear();
+        var groupsByPath = new Dictionary<string, (string Path, List<string> Keywords)>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var mapping in _configuration.Mappings)
+        {
+            var path = mapping.FolderPath.Trim();
+            if (!groupsByPath.TryGetValue(path, out var group))
+            {
+                group = (mapping.FolderPath, []);
+                groupsByPath.Add(path, group);
+            }
+
+            group.Keywords.Add(mapping.Alias);
+        }
+
+        foreach (var group in groupsByPath.Values)
+        {
+            AddGroup(new MappingGroupEditorViewModel(group.Keywords, group.Path));
+        }
+
+        MappingFilter = string.Empty;
+        SelectedMappingGroup = null;
         Message = string.Empty;
+        RefreshFilteredMappingGroups();
         RefreshEverythingHealth();
     }
 
@@ -154,23 +212,30 @@ public sealed class SettingsViewModel : ObservableObject
 
     public void AddMapping()
     {
-        var mapping = new MappingEditorViewModel();
-        Mappings.Add(mapping);
-        SelectedMapping = mapping;
+        var group = new MappingGroupEditorViewModel();
+        group.PropertyChanged += MappingGroup_PropertyChanged;
+        MappingGroups.Insert(0, group);
+        RefreshFilteredMappingGroups();
+        SelectedMappingGroup = group;
     }
 
     public void DeleteSelectedMapping()
     {
-        if (SelectedMapping is null)
+        if (SelectedMappingGroup is null)
         {
             return;
         }
 
-        var index = Mappings.IndexOf(SelectedMapping);
-        Mappings.Remove(SelectedMapping);
-        SelectedMapping = Mappings.Count == 0
+        var selected = SelectedMappingGroup;
+        var index = FilteredMappingGroups.ToList().IndexOf(selected);
+        selected.PropertyChanged -= MappingGroup_PropertyChanged;
+        MappingGroups.Remove(selected);
+        RefreshFilteredMappingGroups();
+        SelectedMappingGroup = FilteredMappingGroups.Count == 0
             ? null
-            : Mappings[Math.Min(index, Mappings.Count - 1)];
+            : FilteredMappingGroups[Math.Min(
+                Math.Max(index, 0),
+                FilteredMappingGroups.Count - 1)];
     }
 
     public void Cancel()
@@ -252,7 +317,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     private AppConfiguration BuildCandidate(string shortcut)
     {
-        ValidateMappings();
+        ValidateMappingGroups();
         var candidate = _configuration.Clone();
         candidate.Settings = candidate.Settings with
         {
@@ -260,17 +325,22 @@ public sealed class SettingsViewModel : ObservableObject
             StartWithWindows = StartWithWindows
         };
 
-        var retainedOriginalMappings = Mappings
-            .Where(mapping =>
-                mapping.OriginalAlias is not null
-                && mapping.OriginalFolderPath is not null)
-            .Select(mapping => GetMappingKey(
-                mapping.OriginalAlias!,
-                mapping.OriginalFolderPath!))
-            .ToHashSet(StringComparer.Ordinal);
+        var desiredMappings = new Dictionary<string, (string Alias, string Path)>(
+            StringComparer.Ordinal);
+        foreach (var group in MappingGroups)
+        {
+            var path = group.FolderPath.Trim();
+            foreach (var keyword in group.ParseKeywords())
+            {
+                desiredMappings.TryAdd(
+                    GetMappingKey(keyword, path),
+                    (keyword, path));
+            }
+        }
+
         foreach (var mapping in candidate.Mappings.ToArray())
         {
-            if (!retainedOriginalMappings.Contains(GetMappingKey(
+            if (!desiredMappings.ContainsKey(GetMappingKey(
                     mapping.Alias,
                     mapping.FolderPath)))
             {
@@ -278,48 +348,60 @@ public sealed class SettingsViewModel : ObservableObject
             }
         }
 
-        foreach (var mapping in Mappings)
+        foreach (var desired in desiredMappings.Values)
         {
-            var alias = mapping.Alias.Trim();
-            var path = mapping.FolderPath.Trim();
-            if (mapping.OriginalAlias is null
-                || mapping.OriginalFolderPath is null)
+            if (!candidate.FindMappings(desired.Alias).Any(mapping =>
+                    string.Equals(
+                        mapping.FolderPath.Trim(),
+                        desired.Path,
+                        StringComparison.OrdinalIgnoreCase)))
             {
-                candidate.AddMapping(alias, path);
-            }
-            else
-            {
-                candidate.UpdateMapping(
-                    mapping.OriginalAlias,
-                    mapping.OriginalFolderPath,
-                    alias,
-                    path);
+                candidate.AddMapping(desired.Alias, desired.Path);
             }
         }
 
         return candidate;
     }
 
-    private void ValidateMappings()
+    private void ValidateMappingGroups()
     {
-        var mappingKeys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var mapping in Mappings)
+        var folderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var group in MappingGroups)
         {
-            if (string.IsNullOrWhiteSpace(mapping.Alias)
-                || string.IsNullOrWhiteSpace(mapping.FolderPath))
+            if (group.ParseKeywords().Count == 0
+                || string.IsNullOrWhiteSpace(group.FolderPath))
             {
                 throw new SettingsTransactionException(
                     "映射的关键词和文件夹路径不能为空。");
             }
 
-            if (!mappingKeys.Add(GetMappingKey(
-                    mapping.Alias,
-                    mapping.FolderPath)))
+            if (!folderPaths.Add(group.FolderPath.Trim()))
             {
                 throw new SettingsTransactionException(
-                    $"映射重复：{mapping.Alias} → {mapping.FolderPath}");
+                    $"文件夹路径重复，请将关键词合并到同一条映射：{group.FolderPath}");
             }
         }
+    }
+
+    private void AddGroup(MappingGroupEditorViewModel group)
+    {
+        group.PropertyChanged += MappingGroup_PropertyChanged;
+        MappingGroups.Add(group);
+    }
+
+    private void MappingGroup_PropertyChanged(
+        object? sender,
+        PropertyChangedEventArgs e)
+    {
+        RefreshFilteredMappingGroups();
+    }
+
+    private void RefreshFilteredMappingGroups()
+    {
+        FilteredMappingGroups = MappingGroups
+            .Where(group => group.Matches(MappingFilter))
+            .ToArray();
+        OnPropertyChanged(nameof(MappingCountText));
     }
 
     private static string GetMappingKey(string alias, string folderPath) =>

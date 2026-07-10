@@ -35,6 +35,12 @@ public sealed class MappingGroupEditorViewModel : ObservableObject
         set => SetProperty(ref _keywordsText, value ?? string.Empty);
     }
 
+    public string Alias
+    {
+        get => KeywordsText;
+        set => KeywordsText = value;
+    }
+
     public string FolderPath
     {
         get => _folderPath;
@@ -72,4 +78,3 @@ public sealed class MappingGroupEditorViewModel : ObservableObject
             || FolderPath.Contains(value, StringComparison.OrdinalIgnoreCase);
     }
 }
-
