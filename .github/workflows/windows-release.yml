@@ -21,9 +21,9 @@ jobs:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -72,8 +72,8 @@ jobs:
           foreach ($path in $required) {
             if (-not (Test-Path $path)) { throw "Missing publish output: $path" }
           }
-          & artifacts/publish/QuickSearch.exe --smoke-test
-          if ($LASTEXITCODE -ne 0) { throw "Smoke test failed with exit code $LASTEXITCODE" }
+          $process = Start-Process artifacts/publish/QuickSearch.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "Smoke test failed with exit code $($process.ExitCode)" }
 
       - name: Build installer
         shell: pwsh
