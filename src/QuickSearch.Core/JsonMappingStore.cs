@@ -71,7 +71,18 @@ public sealed class JsonMappingStore : IMappingStore
                 temporaryPath,
                 json,
                 cancellationToken);
-            File.Move(temporaryPath, _configPath, overwrite: true);
+            if (File.Exists(_configPath))
+            {
+                File.Replace(
+                    temporaryPath,
+                    _configPath,
+                    destinationBackupFileName: null,
+                    ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporaryPath, _configPath);
+            }
         }
         finally
         {
