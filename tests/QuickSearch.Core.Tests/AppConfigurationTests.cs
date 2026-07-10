@@ -77,6 +77,19 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
+    public void RemoveMapping_RemovesByNormalizedAliasWithoutExposingTheCollection()
+    {
+        var configuration = new AppConfiguration();
+        configuration.UpsertMapping("Sales Team", @"C:\Sales");
+
+        var removed = configuration.RemoveMapping("  SALES\tteam  ");
+
+        Assert.True(removed);
+        Assert.Empty(configuration.Mappings);
+        Assert.False(configuration.RemoveMapping("Sales Team"));
+    }
+
+    [Fact]
     public void GetMappingsForPath_ReturnsMultipleAliasesForOneFolder()
     {
         var configuration = new AppConfiguration();
