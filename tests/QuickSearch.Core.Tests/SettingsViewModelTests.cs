@@ -72,6 +72,74 @@ public sealed class SettingsViewModelTests
         Assert.Equal(1, store.SaveCalls);
     }
 
+    [Fact]
+    public async Task SaveAsync_AllowsRepeatedKeywordWithDifferentPaths()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.AddMapping();
+        viewModel.Mappings[^1].Alias = " SALES ";
+        viewModel.Mappings[^1].FolderPath = "/sales-archive";
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal(2, configuration.FindMappings("sales").Count);
+        Assert.Equal(1, store.SaveCalls);
+        Assert.DoesNotContain("重复", viewModel.Message);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RejectsExactKeywordAndPathDuplicateIgnoringCase()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.AddMapping();
+        viewModel.Mappings[^1].Alias = " SALES ";
+        viewModel.Mappings[^1].FolderPath = "/SALES";
+
+        await viewModel.SaveAsync();
+
+        Assert.Single(configuration.FindMappings("sales"));
+        Assert.Equal(0, store.SaveCalls);
+        Assert.Contains("重复", viewModel.Message);
+    }
+
+    [Fact]
+    public async Task SaveAsync_EditsOnlySelectedPathForRepeatedKeyword()
+    {
+        var configuration = CreateConfiguration();
+        configuration.AddMapping("sales", "/sales-archive");
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.Mappings.Single(mapping =>
+            mapping.FolderPath == "/sales-archive").FolderPath = "/sales-history";
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal(
+            ["/sales", "/sales-history"],
+            configuration.FindMappings("sales").Select(mapping => mapping.FolderPath));
+    }
+
+    [Fact]
+    public async Task SaveAsync_DeletesOnlySelectedPathForRepeatedKeyword()
+    {
+        var configuration = CreateConfiguration();
+        configuration.AddMapping("sales", "/sales-archive");
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.SelectedMapping = viewModel.Mappings.Single(mapping =>
+            mapping.FolderPath == "/sales-archive");
+        viewModel.DeleteSelectedMapping();
+
+        await viewModel.SaveAsync();
+
+        var mapping = Assert.Single(configuration.FindMappings("sales"));
+        Assert.Equal("/sales", mapping.FolderPath);
+    }
+
     public static TheoryData<EverythingHealth, string?, string> HealthStatuses => new()
     {
         { EverythingHealth.Ready, null, "Everything 已就绪" },

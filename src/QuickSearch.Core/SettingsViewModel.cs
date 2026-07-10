@@ -260,15 +260,21 @@ public sealed class SettingsViewModel : ObservableObject
             StartWithWindows = StartWithWindows
         };
 
-        var retainedOriginalAliases = Mappings
-            .Select(mapping => mapping.OriginalAlias)
-            .Where(alias => alias is not null)
+        var retainedOriginalMappings = Mappings
+            .Where(mapping =>
+                mapping.OriginalAlias is not null
+                && mapping.OriginalFolderPath is not null)
+            .Select(mapping => GetMappingKey(
+                mapping.OriginalAlias!,
+                mapping.OriginalFolderPath!))
             .ToHashSet(StringComparer.Ordinal);
         foreach (var mapping in candidate.Mappings.ToArray())
         {
-            if (!retainedOriginalAliases.Contains(mapping.Alias))
+            if (!retainedOriginalMappings.Contains(GetMappingKey(
+                    mapping.Alias,
+                    mapping.FolderPath)))
             {
-                candidate.RemoveMapping(mapping.Alias);
+                candidate.RemoveMapping(mapping.Alias, mapping.FolderPath);
             }
         }
 
@@ -276,13 +282,18 @@ public sealed class SettingsViewModel : ObservableObject
         {
             var alias = mapping.Alias.Trim();
             var path = mapping.FolderPath.Trim();
-            if (mapping.OriginalAlias is null)
+            if (mapping.OriginalAlias is null
+                || mapping.OriginalFolderPath is null)
             {
-                candidate.UpsertMapping(alias, path);
+                candidate.AddMapping(alias, path);
             }
             else
             {
-                candidate.UpdateMapping(mapping.OriginalAlias, alias, path);
+                candidate.UpdateMapping(
+                    mapping.OriginalAlias,
+                    mapping.OriginalFolderPath,
+                    alias,
+                    path);
             }
         }
 
@@ -291,22 +302,28 @@ public sealed class SettingsViewModel : ObservableObject
 
     private void ValidateMappings()
     {
-        var aliases = new HashSet<string>(StringComparer.Ordinal);
+        var mappingKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var mapping in Mappings)
         {
             if (string.IsNullOrWhiteSpace(mapping.Alias)
                 || string.IsNullOrWhiteSpace(mapping.FolderPath))
             {
                 throw new SettingsTransactionException(
-                    "映射的邮箱别名和文件夹路径不能为空。");
+                    "映射的关键词和文件夹路径不能为空。");
             }
 
-            if (!aliases.Add(AliasNormalizer.Normalize(mapping.Alias)))
+            if (!mappingKeys.Add(GetMappingKey(
+                    mapping.Alias,
+                    mapping.FolderPath)))
             {
-                throw new SettingsTransactionException($"映射别名重复：{mapping.Alias}");
+                throw new SettingsTransactionException(
+                    $"映射重复：{mapping.Alias} → {mapping.FolderPath}");
             }
         }
     }
+
+    private static string GetMappingKey(string alias, string folderPath) =>
+        $"{AliasNormalizer.Normalize(alias)}\u001F{folderPath.Trim().ToUpperInvariant()}";
 
     private async Task<string> RollBackAsync(
         AppConfiguration previous,
