@@ -25,6 +25,8 @@ PrivilegesRequired=lowest
 CloseApplications=force
 RestartApplications=no
 UninstallDisplayName=QuickSearch
+UninstallDisplayIcon={app}\QuickSearch.exe
+SetupIconFile=..\src\QuickSearch.Windows\Assets\QuickSearch.ico
 WizardStyle=modern
 
 [Files]

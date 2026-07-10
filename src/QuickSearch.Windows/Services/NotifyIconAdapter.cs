@@ -17,7 +17,7 @@ public sealed class NotifyIconAdapter : ITrayIcon
         _notifyIcon = new Forms.NotifyIcon
         {
             Text = "QuickSearch",
-            Icon = Drawing.SystemIcons.Application,
+            Icon = LoadApplicationIcon(),
             ContextMenuStrip = menu
         };
         _notifyIcon.DoubleClick += NotifyIcon_DoubleClick;
@@ -37,7 +37,20 @@ public sealed class NotifyIconAdapter : ITrayIcon
     {
         _notifyIcon.DoubleClick -= NotifyIcon_DoubleClick;
         _notifyIcon.Visible = false;
+        var icon = _notifyIcon.Icon;
+        _notifyIcon.Icon = null;
         _notifyIcon.Dispose();
+        icon?.Dispose();
+    }
+
+    private static Drawing.Icon LoadApplicationIcon()
+    {
+        var resource = System.Windows.Application.GetResourceStream(
+            new Uri("pack://application:,,,/Assets/QuickSearch.ico"))
+            ?? throw new InvalidOperationException(
+                "QuickSearch icon resource is unavailable.");
+        using var icon = new Drawing.Icon(resource.Stream);
+        return (Drawing.Icon)icon.Clone();
     }
 
     private void NotifyIcon_DoubleClick(object? sender, EventArgs e) =>

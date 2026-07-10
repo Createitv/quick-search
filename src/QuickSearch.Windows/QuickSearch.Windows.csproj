@@ -13,9 +13,13 @@
     <Platforms>x64</Platforms>
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationIcon>Assets\QuickSearch.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\QuickSearch.Core\QuickSearch.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\QuickSearch.ico" />
   </ItemGroup>
   <ItemGroup Condition="Exists('native\Everything64.dll')">
     <Content Include="native\Everything64.dll"
