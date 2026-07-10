@@ -13,7 +13,7 @@ public partial class App : System.Windows.Application
     {
         if (e.Args.Contains("--smoke-test", StringComparer.OrdinalIgnoreCase))
         {
-            Shutdown(SmokeCheck.Run());
+            Environment.Exit(SmokeCheck.Run());
             return;
         }
 
