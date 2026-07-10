@@ -124,6 +124,42 @@ public sealed class AppConfiguration
             StringComparison.Ordinal)) > 0;
     }
 
+    public FolderMapping UpdateMapping(
+        string originalAlias,
+        string alias,
+        string folderPath)
+    {
+        var originalNormalizedAlias = AliasNormalizer.Normalize(originalAlias);
+        var originalIndex = _mappings.FindIndex(mapping => string.Equals(
+            mapping.NormalizedAlias,
+            originalNormalizedAlias,
+            StringComparison.Ordinal));
+        if (originalIndex < 0)
+        {
+            return UpsertMapping(alias, folderPath);
+        }
+
+        var normalizedAlias = AliasNormalizer.Normalize(alias);
+        var conflictingIndex = _mappings.FindIndex(mapping => string.Equals(
+            mapping.NormalizedAlias,
+            normalizedAlias,
+            StringComparison.Ordinal));
+        if (conflictingIndex >= 0 && conflictingIndex != originalIndex)
+        {
+            throw new InvalidOperationException($"映射别名重复：{alias}");
+        }
+
+        var original = _mappings[originalIndex];
+        var updated = new FolderMapping(
+            alias,
+            folderPath,
+            original.CreatedAtUtc,
+            _timeProvider.GetUtcNow().ToUniversalTime(),
+            original.LastUsedAtUtc);
+        _mappings[originalIndex] = updated;
+        return updated;
+    }
+
     public IReadOnlyList<FolderMapping> GetMappingsForPath(string folderPath)
     {
         ArgumentNullException.ThrowIfNull(folderPath);
@@ -134,5 +170,19 @@ public sealed class AppConfiguration
                 folderPath,
                 StringComparison.OrdinalIgnoreCase))
             .ToArray();
+    }
+
+    public AppConfiguration Clone() => new(_timeProvider)
+    {
+        Settings = Settings with { },
+        Mappings = _mappings.Select(mapping => mapping with { }).ToArray()
+    };
+
+    public void ReplaceWith(AppConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        Settings = configuration.Settings with { };
+        _mappings.Clear();
+        _mappings.AddRange(configuration._mappings.Select(mapping => mapping with { }));
     }
 }

@@ -1,39 +1,72 @@
 <Window x:Class="QuickSearch.Windows.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="QuickSearch 设置" Width="640" Height="520"
-        WindowStartupLocation="CenterOwner">
+        Title="QuickSearch 设置" Width="680" Height="600"
+        MinWidth="600" MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Closing="Window_Closing">
+  <Window.InputBindings>
+    <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
+  </Window.InputBindings>
   <Grid Margin="22">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
+
     <TextBlock Grid.Row="0" Text="设置" FontSize="24" FontWeight="SemiBold" />
-    <StackPanel Grid.Row="1" Margin="0,14,0,8">
+
+    <Border Grid.Row="1" Background="#F3F5F7" CornerRadius="6" Padding="10" Margin="0,12,0,4">
+      <TextBlock Text="{Binding EverythingHealthText}" TextWrapping="Wrap" />
+    </Border>
+
+    <StackPanel Grid.Row="2" Margin="0,8">
       <TextBlock Text="全局快捷键（例如 Ctrl+Alt+F）" />
-      <TextBox x:Name="ShortcutBox" />
-      <CheckBox x:Name="StartupCheck" Content="登录 Windows 后自动启动" Margin="0,8" />
+      <TextBox Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
+      <CheckBox Content="登录 Windows 后自动启动" Margin="0,8"
+                IsChecked="{Binding StartWithWindows}" />
     </StackPanel>
-    <DockPanel Grid.Row="2" Margin="0,8">
-      <Button DockPanel.Dock="Right" Content="删除所选映射" Click="Delete_Click" />
-      <TextBlock Text="已保存映射" FontWeight="SemiBold" VerticalAlignment="Center" />
+
+    <DockPanel Grid.Row="3" Margin="0,8">
+      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+        <Button Content="新建映射" Command="{Binding AddMappingCommand}" />
+        <Button Content="删除所选映射" Command="{Binding DeleteMappingCommand}" />
+      </StackPanel>
+      <TextBlock Text="映射编辑（保存前不会生效）"
+                 FontWeight="SemiBold" VerticalAlignment="Center" />
     </DockPanel>
-    <ListBox Grid.Row="3" x:Name="MappingsList">
+
+    <ListBox Grid.Row="4"
+             ItemsSource="{Binding Mappings}"
+             SelectedItem="{Binding SelectedMapping, Mode=TwoWay}">
       <ListBox.ItemTemplate>
         <DataTemplate>
-          <StackPanel Margin="4">
-            <TextBlock Text="{Binding Alias}" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding FolderPath}" Foreground="#555" TextWrapping="Wrap" />
-          </StackPanel>
+          <Grid Margin="4">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="170" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBox Grid.Column="0" Margin="0,2,8,2"
+                     Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBox Grid.Column="1" Margin="0,2"
+                     Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
+          </Grid>
         </DataTemplate>
       </ListBox.ItemTemplate>
     </ListBox>
-    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-      <Button Content="取消" IsCancel="True" />
-      <Button Content="保存" IsDefault="True" Click="Save_Click" />
+
+    <TextBlock Grid.Row="5" Text="{Binding Message}" Foreground="#B42318"
+               TextWrapping="Wrap" Margin="0,10,0,0" />
+
+    <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+      <Button Content="取消" Command="{Binding CancelCommand}" />
+      <Button Content="保存" IsDefault="True" Command="{Binding SaveCommand}" />
     </StackPanel>
   </Grid>
 </Window>

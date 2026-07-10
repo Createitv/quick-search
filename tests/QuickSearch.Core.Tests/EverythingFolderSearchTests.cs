@@ -222,6 +222,65 @@ public sealed class EverythingFolderSearchTests
         Assert.Contains("native adapter exploded", search.FailureMessage);
     }
 
+    [Fact]
+    public async Task SearchAsync_ReturnsControlBeforeBlockingNativeQueryCompletes()
+    {
+        var native = new FakeEverythingNative { BlockQuery = true };
+        var search = new EverythingFolderSearch(native);
+        Task<IReadOnlyList<FolderSearchResult>>? pendingSearch = null;
+        var callReturned = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(() =>
+        {
+            pendingSearch = search.SearchAsync("Invoices");
+            callReturned.TrySetResult();
+        });
+        await native.QueryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            await callReturned.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.NotNull(pendingSearch);
+            Assert.False(pendingSearch.IsCompleted);
+        }
+        finally
+        {
+            native.ReleaseQuery();
+        }
+
+        await pendingSearch!;
+    }
+
+    [Fact]
+    public async Task SearchAsync_CancelsCallerWhileBlockingNativeQueryFinishesInWorker()
+    {
+        var native = new FakeEverythingNative { BlockQuery = true };
+        var search = new EverythingFolderSearch(native);
+        using var cancellation = new CancellationTokenSource();
+        Task<IReadOnlyList<FolderSearchResult>>? pendingSearch = null;
+        var callReturned = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(() =>
+        {
+            pendingSearch = search.SearchAsync("Invoices", cancellation.Token);
+            callReturned.TrySetResult();
+        });
+        await native.QueryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+
+        try
+        {
+            await callReturned.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.NotNull(pendingSearch);
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => pendingSearch.WaitAsync(TimeSpan.FromSeconds(1)));
+        }
+        finally
+        {
+            native.ReleaseQuery();
+        }
+    }
+
     private sealed class FakeEverythingNative : IEverythingNative
     {
         public uint RequestFlags { get; private set; }
@@ -241,6 +300,13 @@ public sealed class EverythingFolderSearchTests
         public Exception? QueryException { get; init; }
 
         public bool QueryCalled { get; private set; }
+
+        public bool BlockQuery { get; init; }
+
+        public TaskCompletionSource QueryStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private ManualResetEventSlim QueryRelease { get; } = new(initialState: false);
 
         public bool GetLastErrorCalled { get; private set; }
 
@@ -267,6 +333,12 @@ public sealed class EverythingFolderSearchTests
         public bool Query(bool wait)
         {
             QueryCalled = true;
+            QueryStarted.TrySetResult();
+            if (BlockQuery)
+            {
+                QueryRelease.Wait();
+            }
+
             if (QueryException is not null)
             {
                 throw QueryException;
@@ -274,6 +346,8 @@ public sealed class EverythingFolderSearchTests
 
             return QueryResult;
         }
+
+        public void ReleaseQuery() => QueryRelease.Set();
 
         public uint GetNumResults() => (uint)Results.Count;
 

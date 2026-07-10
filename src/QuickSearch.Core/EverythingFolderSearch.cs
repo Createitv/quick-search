@@ -27,15 +27,37 @@ public sealed class EverythingFolderSearch : IFolderSearch
 
     public string? FailureMessage { get; private set; }
 
-    public Task<IReadOnlyList<FolderSearchResult>> SearchAsync(
+    public async Task<IReadOnlyList<FolderSearchResult>> SearchAsync(
         string query,
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        FailureMessage = null;
+        var worker = Task.Run(
+            () => SearchOnWorker(query, cancellationToken),
+            CancellationToken.None);
+        try
+        {
+            return await worker.WaitAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _ = worker.ContinueWith(
+                completed => _ = completed.Exception,
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            throw;
+        }
+    }
 
+    private IReadOnlyList<FolderSearchResult> SearchOnWorker(
+        string query,
+        CancellationToken cancellationToken)
+    {
         lock (_sync)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            FailureMessage = null;
             try
             {
                 if (!_native.IsDatabaseLoaded())
@@ -45,7 +67,7 @@ public sealed class EverythingFolderSearch : IFolderSearch
                     FailureMessage = Health == EverythingHealth.QueryFailed
                         ? $"Everything 就绪检查失败（错误 {error}）。"
                         : null;
-                    return Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+                    return [];
                 }
 
                 _native.SetSearch(EverythingQueryBuilder.Build(query));
@@ -58,7 +80,7 @@ public sealed class EverythingFolderSearch : IFolderSearch
                     FailureMessage = Health == EverythingHealth.QueryFailed
                         ? $"Everything 查询失败（错误 {error}）。"
                         : null;
-                    return Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+                    return [];
                 }
 
                 var candidates = new List<FolderSearchResult>();
@@ -77,26 +99,26 @@ public sealed class EverythingFolderSearch : IFolderSearch
                 }
 
                 Health = EverythingHealth.Ready;
-                return Task.FromResult(FolderSearchRanker.Rank(candidates, query));
+                return FolderSearchRanker.Rank(candidates, query);
             }
             catch (DllNotFoundException)
             {
                 Health = EverythingHealth.DllMissing;
                 FailureMessage = "缺少 Everything64.dll。";
-                return Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+                return [];
             }
             catch (EntryPointNotFoundException)
             {
                 Health = EverythingHealth.DllMissing;
                 FailureMessage = "Everything64.dll 版本不兼容。";
-                return Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+                return [];
             }
             catch (Exception exception) when (
                 exception is not OperationCanceledException and not ArgumentException)
             {
                 Health = EverythingHealth.QueryFailed;
                 FailureMessage = $"Everything 平台调用失败：{exception.Message}";
-                return Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+                return [];
             }
         }
     }

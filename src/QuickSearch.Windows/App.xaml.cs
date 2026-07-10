@@ -8,6 +8,7 @@ public partial class App : System.Windows.Application
 {
     private ISingleInstanceService? _singleInstance;
     private MainWindow? _mainWindow;
+    private TrayIconController? _trayController;
 
     protected override async void OnStartup(System.Windows.StartupEventArgs e)
     {
@@ -22,13 +23,24 @@ public partial class App : System.Windows.Application
         }
 
         _singleInstance = serviceResult.Value;
-        var activationController = new SingleInstanceActivationController(_singleInstance);
-        if (!_singleInstance.IsPrimary)
+        var backgroundRequested = e.Args.Contains(
+            "--background",
+            StringComparer.OrdinalIgnoreCase);
+        var disposition = AppLaunchDecision.Decide(
+            _singleInstance.IsPrimary,
+            backgroundRequested);
+        if (disposition != AppLaunchDisposition.StartPrimary)
         {
-            var secondaryResult = activationController.Start(() => { });
-            if (!secondaryResult.Operation.Success)
+            if (disposition == AppLaunchDisposition.NotifyExistingAndExit)
             {
-                System.Windows.MessageBox.Show(secondaryResult.Operation.Message, "QuickSearch");
+                var secondaryResult = new SingleInstanceActivationController(
+                    _singleInstance).Start(() => { });
+                if (!secondaryResult.Operation.Success)
+                {
+                    System.Windows.MessageBox.Show(
+                        secondaryResult.Operation.Message,
+                        "QuickSearch");
+                }
             }
 
             Shutdown();
@@ -40,24 +52,32 @@ public partial class App : System.Windows.Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "QuickSearch");
         var store = new JsonMappingStore(Path.Combine(configDirectory, "config.json"));
-        _mainWindow = new MainWindow(
+        var search = new EverythingFolderSearch(new EverythingNativeAdapter());
+        var startup = new StartupRegistration();
+        var launcherViewModel = new LauncherViewModel(
             store,
-            new EverythingFolderSearch(new EverythingNativeAdapter()),
+            search,
             new ClipboardTextReader(),
-            new ExplorerFolderOpener(),
-            new StartupRegistration());
+            new ExplorerFolderOpener());
+        _mainWindow = new MainWindow(
+            launcherViewModel,
+            store,
+            search,
+            startup);
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();
 
+        var activationController = new SingleInstanceActivationController(_singleInstance);
         var primaryResult = activationController.Start(
             () => Dispatcher.BeginInvoke(_mainWindow.ActivateFromClipboard));
         if (!primaryResult.Operation.Success)
         {
-            System.Windows.MessageBox.Show(primaryResult.Operation.Message, "QuickSearch");
+            _mainWindow.ReportStatus(primaryResult.Operation.Message);
         }
 
-        if (!e.Args.Contains("--background", StringComparer.OrdinalIgnoreCase))
+        InitializeTray();
+        if (!backgroundRequested)
         {
             _mainWindow.ActivateFromClipboard();
         }
@@ -65,8 +85,39 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
+        _trayController?.Dispose();
         _mainWindow?.Dispose();
         _singleInstance?.Dispose();
         base.OnExit(e);
+    }
+
+    private void InitializeTray()
+    {
+        if (_mainWindow is null)
+        {
+            return;
+        }
+
+        var trayResult = PlatformBoundary.Capture<ITrayIcon>(
+            () => new NotifyIconAdapter(),
+            "无法初始化系统托盘图标");
+        if (!trayResult.Success || trayResult.Value is null)
+        {
+            _mainWindow.ReportStatus(trayResult.Message);
+            return;
+        }
+
+        _trayController = new TrayIconController(
+            trayResult.Value,
+            () => Dispatcher.Invoke(_mainWindow.ShowLauncher),
+            () => Dispatcher.Invoke(_mainWindow.ShowSettings),
+            () => Dispatcher.Invoke(_mainWindow.ExitApplication));
+        _trayController.FailureReported += message =>
+            Dispatcher.BeginInvoke(() => _mainWindow.ReportStatus(message));
+        var showResult = _trayController.Start();
+        if (!showResult.Success)
+        {
+            _mainWindow.ReportStatus(showResult.Message);
+        }
     }
 }
