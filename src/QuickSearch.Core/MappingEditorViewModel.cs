@@ -8,6 +8,7 @@ public sealed class MappingEditorViewModel : ObservableObject
     internal MappingEditorViewModel(FolderMapping mapping)
     {
         OriginalAlias = mapping.Alias;
+        OriginalFolderPath = mapping.FolderPath;
         _alias = mapping.Alias;
         _folderPath = mapping.FolderPath;
     }
@@ -19,6 +20,8 @@ public sealed class MappingEditorViewModel : ObservableObject
     }
 
     internal string? OriginalAlias { get; }
+
+    internal string? OriginalFolderPath { get; }
 
     public string Alias
     {

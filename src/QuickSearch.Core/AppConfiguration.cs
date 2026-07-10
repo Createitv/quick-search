@@ -24,22 +24,14 @@ public sealed class AppConfiguration
         init
         {
             _mappings.Clear();
-            var indexesByNormalizedAlias = new Dictionary<string, int>(
-                StringComparer.Ordinal);
+            var mappingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var mapping in value ?? [])
             {
-                if (indexesByNormalizedAlias.TryGetValue(
+                if (mappingKeys.Add(GetMappingKey(
                         mapping.NormalizedAlias,
-                        out var existingIndex))
+                        mapping.FolderPath)))
                 {
-                    _mappings[existingIndex] = mapping;
-                }
-                else
-                {
-                    indexesByNormalizedAlias.Add(
-                        mapping.NormalizedAlias,
-                        _mappings.Count);
                     _mappings.Add(mapping);
                 }
             }
@@ -55,6 +47,38 @@ public sealed class AppConfiguration
                 mapping.NormalizedAlias,
                 normalizedAlias,
                 StringComparison.Ordinal));
+    }
+
+    public IReadOnlyList<FolderMapping> FindMappings(string alias)
+    {
+        var normalizedAlias = AliasNormalizer.Normalize(alias);
+
+        return _mappings
+            .Where(mapping => string.Equals(
+                mapping.NormalizedAlias,
+                normalizedAlias,
+                StringComparison.Ordinal))
+            .ToArray();
+    }
+
+    public FolderMapping AddMapping(string alias, string folderPath)
+    {
+        var existing = _mappings.FirstOrDefault(mapping =>
+            IsSameMapping(mapping, alias, folderPath));
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var utcNow = _timeProvider.GetUtcNow().ToUniversalTime();
+        var mapping = new FolderMapping(
+            alias,
+            folderPath,
+            utcNow,
+            utcNow,
+            null);
+        _mappings.Add(mapping);
+        return mapping;
     }
 
     public FolderMapping UpsertMapping(string alias, string folderPath)
@@ -115,6 +139,23 @@ public sealed class AppConfiguration
         return mapping;
     }
 
+    public FolderMapping? MarkMappingUsed(string alias, string folderPath)
+    {
+        var existingIndex = _mappings.FindIndex(mapping =>
+            IsSameMapping(mapping, alias, folderPath));
+        if (existingIndex < 0)
+        {
+            return null;
+        }
+
+        var mapping = _mappings[existingIndex] with
+        {
+            LastUsedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime()
+        };
+        _mappings[existingIndex] = mapping;
+        return mapping;
+    }
+
     public bool RemoveMapping(string alias)
     {
         var normalizedAlias = AliasNormalizer.Normalize(alias);
@@ -124,29 +165,46 @@ public sealed class AppConfiguration
             StringComparison.Ordinal)) > 0;
     }
 
+    public bool RemoveMapping(string alias, string folderPath) =>
+        _mappings.RemoveAll(mapping =>
+            IsSameMapping(mapping, alias, folderPath)) > 0;
+
     public FolderMapping UpdateMapping(
         string originalAlias,
         string alias,
         string folderPath)
     {
-        var originalNormalizedAlias = AliasNormalizer.Normalize(originalAlias);
-        var originalIndex = _mappings.FindIndex(mapping => string.Equals(
-            mapping.NormalizedAlias,
-            originalNormalizedAlias,
-            StringComparison.Ordinal));
-        if (originalIndex < 0)
+        var original = FindMapping(originalAlias);
+        if (original is null)
         {
             return UpsertMapping(alias, folderPath);
         }
 
-        var normalizedAlias = AliasNormalizer.Normalize(alias);
-        var conflictingIndex = _mappings.FindIndex(mapping => string.Equals(
-            mapping.NormalizedAlias,
-            normalizedAlias,
-            StringComparison.Ordinal));
+        return UpdateMapping(
+            originalAlias,
+            original.FolderPath,
+            alias,
+            folderPath);
+    }
+
+    public FolderMapping UpdateMapping(
+        string originalAlias,
+        string originalFolderPath,
+        string alias,
+        string folderPath)
+    {
+        var originalIndex = _mappings.FindIndex(mapping =>
+            IsSameMapping(mapping, originalAlias, originalFolderPath));
+        if (originalIndex < 0)
+        {
+            return AddMapping(alias, folderPath);
+        }
+
+        var conflictingIndex = _mappings.FindIndex(mapping =>
+            IsSameMapping(mapping, alias, folderPath));
         if (conflictingIndex >= 0 && conflictingIndex != originalIndex)
         {
-            throw new InvalidOperationException($"映射别名重复：{alias}");
+            throw new InvalidOperationException($"映射已存在：{alias} → {folderPath}");
         }
 
         var original = _mappings[originalIndex];
@@ -185,4 +243,20 @@ public sealed class AppConfiguration
         _mappings.Clear();
         _mappings.AddRange(configuration._mappings.Select(mapping => mapping with { }));
     }
+
+    private static bool IsSameMapping(
+        FolderMapping mapping,
+        string alias,
+        string folderPath) =>
+        string.Equals(
+            mapping.NormalizedAlias,
+            AliasNormalizer.Normalize(alias),
+            StringComparison.Ordinal)
+        && string.Equals(
+            mapping.FolderPath.Trim(),
+            folderPath.Trim(),
+            StringComparison.OrdinalIgnoreCase);
+
+    private static string GetMappingKey(string normalizedAlias, string folderPath) =>
+        $"{normalizedAlias}\u001F{folderPath.Trim()}";
 }

@@ -9,7 +9,7 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
-    public void DirectConstruction_CanonicalizesDuplicateAliasesWithLastEntryWinning()
+    public void DirectConstruction_PreservesDifferentFoldersForSameNormalizedKeyword()
     {
         var configuration = new AppConfiguration
         {
@@ -20,9 +20,10 @@ public sealed class AppConfigurationTests
             ]
         };
 
-        var mapping = Assert.Single(configuration.Mappings);
-        Assert.Equal("SALES\tTEAM", mapping.Alias);
-        Assert.Equal(@"D:\Sales\Current", mapping.FolderPath);
+        Assert.Equal(2, configuration.Mappings.Count);
+        Assert.Equal(
+            [@"C:\Sales\Old", @"D:\Sales\Current"],
+            configuration.Mappings.Select(mapping => mapping.FolderPath));
     }
 
     [Fact]
@@ -178,6 +179,92 @@ public sealed class AppConfigurationTests
         Assert.Equal(
             ["Northwind Billing", "Northwind Invoices"],
             mappings.Select(mapping => mapping.Alias));
+    }
+
+    [Fact]
+    public void DirectConstruction_KeepsDifferentPathsForOneKeywordAndFoldsExactDuplicates()
+    {
+        var configuration = new AppConfiguration
+        {
+            Mappings =
+            [
+                new FolderMapping(" Sales Team ", @"C:\Sales\Current"),
+                new FolderMapping("SALES\tTEAM", @"D:\Sales\Archive"),
+                new FolderMapping("sales team", @"c:\sales\current")
+            ]
+        };
+
+        var mappings = configuration.FindMappings(" sales team ");
+
+        Assert.Equal(2, mappings.Count);
+        Assert.Equal(
+            [@"C:\Sales\Current", @"D:\Sales\Archive"],
+            mappings.Select(mapping => mapping.FolderPath));
+    }
+
+    [Fact]
+    public void AddMapping_AllowsOneKeywordToTargetMultipleFoldersWithoutExactDuplicates()
+    {
+        var configuration = new AppConfiguration();
+
+        var current = configuration.AddMapping("project alpha", @"C:\Alpha");
+        var archive = configuration.AddMapping(
+            " PROJECT\tALPHA ",
+            @"D:\Archive\Alpha");
+        var duplicate = configuration.AddMapping(
+            "project alpha",
+            @"c:\alpha");
+
+        Assert.Equal(2, configuration.FindMappings("project alpha").Count);
+        Assert.Same(current, duplicate);
+        Assert.NotSame(current, archive);
+    }
+
+    [Fact]
+    public void UpdateAndRemoveMapping_TargetOnlyOnePathForRepeatedKeyword()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("sales", @"C:\Sales\Current");
+        configuration.AddMapping("sales", @"D:\Sales\Archive");
+
+        configuration.UpdateMapping(
+            "sales",
+            @"C:\Sales\Current",
+            "sales",
+            @"E:\Sales\Current");
+        var removed = configuration.RemoveMapping(
+            "sales",
+            @"D:\Sales\Archive");
+
+        Assert.True(removed);
+        var mapping = Assert.Single(configuration.FindMappings("sales"));
+        Assert.Equal(@"E:\Sales\Current", mapping.FolderPath);
+    }
+
+    [Fact]
+    public void MarkMappingUsed_TargetsOnlyTheSuccessfullyOpenedPath()
+    {
+        var usedAtUtc = new DateTimeOffset(
+            2026,
+            7,
+            10,
+            6,
+            30,
+            0,
+            TimeSpan.Zero);
+        var timeProvider = new SettableTimeProvider(usedAtUtc.AddMinutes(-5));
+        var configuration = new AppConfiguration(timeProvider);
+        configuration.AddMapping("sales", @"C:\Sales\Current");
+        configuration.AddMapping("sales", @"D:\Sales\Archive");
+        timeProvider.UtcNow = usedAtUtc;
+
+        configuration.MarkMappingUsed("sales", @"D:\Sales\Archive");
+
+        var mappings = configuration.FindMappings("sales");
+        Assert.Null(mappings.Single(mapping => mapping.FolderPath.StartsWith("C:")).LastUsedAtUtc);
+        Assert.Equal(
+            usedAtUtc,
+            mappings.Single(mapping => mapping.FolderPath.StartsWith("D:")).LastUsedAtUtc);
     }
 
     private sealed class SettableTimeProvider(DateTimeOffset utcNow) : TimeProvider
