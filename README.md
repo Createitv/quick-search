@@ -42,7 +42,7 @@ dotnet run --project src/QuickSearch.Windows/QuickSearch.Windows.csproj
 
 ## 打包与 Release
 
-GitHub Actions 工作流 `Windows package and release` 会在 `windows-latest` 上运行测试、发布自包含 `win-x64` 程序、执行 EXE 烟雾测试、生成 Inno Setup 安装包并上传 Artifact。手动运行工作流并输入 `v0.1.0` 形式的版本号会创建或更新 GitHub Release。
+GitHub Actions 工作流 `Windows package and release` 会在 `windows-latest` 上运行测试、执行配置读写烟雾测试、发布并检查自包含 `win-x64` 程序、生成 Inno Setup 安装包并上传 Artifact。手动运行工作流并输入 `v0.1.0` 形式的版本号会创建或更新 GitHub Release。
 
 ## 故障排查
 

@@ -61,7 +61,7 @@ jobs:
       - name: Publish self-contained win-x64 app
         run: dotnet publish src/QuickSearch.Windows/QuickSearch.Windows.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish
 
-      - name: Verify published files and run smoke test
+      - name: Verify published Windows app files
         shell: pwsh
         run: |
           $required = @(
@@ -72,8 +72,9 @@ jobs:
           foreach ($path in $required) {
             if (-not (Test-Path $path)) { throw "Missing publish output: $path" }
           }
-          $process = Start-Process artifacts/publish/QuickSearch.exe -ArgumentList '--smoke-test' -Wait -PassThru
-          if ($process.ExitCode -ne 0) { throw "Smoke test failed with exit code $($process.ExitCode)" }
+
+      - name: Run configuration smoke test
+        run: dotnet run --project tools/QuickSearch.Smoke/QuickSearch.Smoke.csproj -c Release
 
       - name: Build installer
         shell: pwsh

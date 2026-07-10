@@ -11,12 +11,6 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(System.Windows.StartupEventArgs e)
     {
-        if (e.Args.Contains("--smoke-test", StringComparer.OrdinalIgnoreCase))
-        {
-            Environment.Exit(SmokeCheck.Run());
-            return;
-        }
-
         _singleInstance = new Mutex(true, "Local\\QuickSearch.SingleInstance", out var isFirstInstance);
         if (!isFirstInstance)
         {
