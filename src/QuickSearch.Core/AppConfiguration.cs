@@ -2,15 +2,28 @@ namespace QuickSearch.Core;
 
 public sealed class AppConfiguration
 {
-    public AppSettings Settings { get; init; } = new();
+    private readonly List<FolderMapping> _mappings = [];
 
-    public List<FolderMapping> Mappings { get; init; } = [];
+    public AppSettings Settings { get; set; } = new();
+
+    public IReadOnlyList<FolderMapping> Mappings
+    {
+        get => _mappings.AsReadOnly();
+        init
+        {
+            _mappings.Clear();
+            foreach (var mapping in value ?? [])
+            {
+                UpsertMapping(mapping.Alias, mapping.FolderPath);
+            }
+        }
+    }
 
     public FolderMapping? FindMapping(string alias)
     {
         var normalizedAlias = AliasNormalizer.Normalize(alias);
 
-        return Mappings.FirstOrDefault(mapping =>
+        return _mappings.FirstOrDefault(mapping =>
             string.Equals(
                 mapping.NormalizedAlias,
                 normalizedAlias,
@@ -20,7 +33,7 @@ public sealed class AppConfiguration
     public FolderMapping UpsertMapping(string alias, string folderPath)
     {
         var mapping = new FolderMapping(alias, folderPath);
-        var existingIndex = Mappings.FindIndex(existing =>
+        var existingIndex = _mappings.FindIndex(existing =>
             string.Equals(
                 existing.NormalizedAlias,
                 mapping.NormalizedAlias,
@@ -28,21 +41,30 @@ public sealed class AppConfiguration
 
         if (existingIndex >= 0)
         {
-            Mappings[existingIndex] = mapping;
+            _mappings[existingIndex] = mapping;
         }
         else
         {
-            Mappings.Add(mapping);
+            _mappings.Add(mapping);
         }
 
         return mapping;
+    }
+
+    public bool RemoveMapping(string alias)
+    {
+        var normalizedAlias = AliasNormalizer.Normalize(alias);
+        return _mappings.RemoveAll(mapping => string.Equals(
+            mapping.NormalizedAlias,
+            normalizedAlias,
+            StringComparison.Ordinal)) > 0;
     }
 
     public IReadOnlyList<FolderMapping> GetMappingsForPath(string folderPath)
     {
         ArgumentNullException.ThrowIfNull(folderPath);
 
-        return Mappings
+        return _mappings
             .Where(mapping => string.Equals(
                 mapping.FolderPath,
                 folderPath,

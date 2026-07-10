@@ -8,7 +8,7 @@ TestResults/
 artifacts/
 publish/
 installer-output/
+src/QuickSearch.Windows/native/*.dll
 .superpowers/
 *.user
 *.suo
-

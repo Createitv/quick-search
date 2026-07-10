@@ -1,0 +1,52 @@
+<Window x:Class="QuickSearch.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QuickSearch" Width="620" Height="560"
+        MinWidth="520" MinHeight="460"
+        WindowStartupLocation="CenterScreen"
+        KeyDown="Window_KeyDown"
+        Closing="Window_Closing">
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <DockPanel Grid.Row="0" Margin="0,0,0,12">
+      <Button DockPanel.Dock="Right" Content="设置" Click="Settings_Click" />
+      <StackPanel>
+        <TextBlock Text="QuickSearch" FontSize="26" FontWeight="SemiBold" />
+        <TextBlock Text="复制邮箱别名后按 Ctrl+Alt+F" Foreground="#666" />
+      </StackPanel>
+    </DockPanel>
+
+    <StackPanel Grid.Row="1">
+      <TextBlock Text="邮箱别名" FontWeight="SemiBold" />
+      <TextBox x:Name="AliasBox" FontSize="17" TextChanged="AliasBox_TextChanged" />
+      <TextBlock Text="文件夹名称" FontWeight="SemiBold" Margin="0,8,0,0" />
+      <DockPanel>
+        <Button DockPanel.Dock="Right" Content="搜索" Click="Search_Click" />
+        <TextBox x:Name="FolderQueryBox" FontSize="17" KeyDown="FolderQueryBox_KeyDown" />
+      </DockPanel>
+    </StackPanel>
+
+    <Border Grid.Row="2" Background="#F3F5F7" CornerRadius="6" Padding="12" Margin="0,10">
+      <TextBlock x:Name="StatusText" TextWrapping="Wrap" Text="正在初始化…" />
+    </Border>
+
+    <ListBox Grid.Row="3" x:Name="ResultsList" DisplayMemberPath="FullPath"
+             MouseDoubleClick="ResultsList_MouseDoubleClick" />
+
+    <TextBlock Grid.Row="4" x:Name="SelectedPathText" Margin="0,10,0,4"
+               TextWrapping="Wrap" Foreground="#444" />
+
+    <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Content="隐藏" Click="Hide_Click" />
+      <Button x:Name="OpenButton" Content="确认并打开" IsDefault="True" Click="Open_Click" />
+    </StackPanel>
+  </Grid>
+</Window>
