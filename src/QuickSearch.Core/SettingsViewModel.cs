@@ -212,6 +212,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     public void AddMapping()
     {
+        MappingFilter = string.Empty;
         var group = new MappingGroupEditorViewModel();
         group.PropertyChanged += MappingGroup_PropertyChanged;
         MappingGroups.Insert(0, group);

@@ -67,6 +67,20 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void AddMapping_ClearsActiveFilterSoNewGroupRemainsVisible()
+    {
+        var viewModel = CreateViewModel(
+            CreateConfiguration(),
+            new FakeMappingStore());
+        viewModel.MappingFilter = "sales";
+
+        viewModel.AddMapping();
+
+        Assert.Equal(string.Empty, viewModel.MappingFilter);
+        Assert.Same(viewModel.SelectedMappingGroup, viewModel.FilteredMappingGroups[0]);
+    }
+
+    [Fact]
     public void DeleteSelectedMapping_RemovesSourceGroupWhileFiltered()
     {
         var configuration = new AppConfiguration();
