@@ -201,7 +201,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
             if (string.IsNullOrWhiteSpace(result.Value))
             {
-                SetStatus("剪贴板中没有可用的邮箱别名，请手动输入。", StatusKind.Neutral);
+                SetStatus("剪贴板中没有可用的关键词，请手动输入。", StatusKind.Neutral);
                 return;
             }
 
@@ -353,7 +353,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            SetStatus("请输入邮箱别名。", StatusKind.Neutral);
+            SetStatus("请输入关键词。", StatusKind.Neutral);
             return;
         }
 
@@ -506,7 +506,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            SetStatus("请先复制或输入邮箱别名。", StatusKind.Neutral);
+            SetStatus("请先复制或输入关键词。", StatusKind.Neutral);
             NotifyConfirmStateChanged();
             return;
         }
@@ -517,7 +517,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             _exactMapping = mapping;
             var folderName = Path.GetFileName(
                 mapping.FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            SetStatus($"已找到保存的映射：{mapping.Alias} → {folderName}\n{mapping.FolderPath}\n请确认后打开。", StatusKind.Success);
+            SetStatus($"已找到保存的映射：{mapping.Alias} → {folderName}\n{mapping.FolderPath}", StatusKind.Success);
             NotifyResolutionStateChanged();
             NotifyConfirmStateChanged();
             return;
@@ -525,7 +525,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
         SetStatus(
             mapping is null
-                ? "首次使用这个别名，请输入真实文件夹名称并搜索。"
+                ? "这个关键词还没有映射，正在搜索匹配的文件夹。"
                 : "保存的文件夹已经不存在，请重新搜索并修复映射。",
             mapping is null ? StatusKind.Neutral : StatusKind.Error);
         if (string.IsNullOrWhiteSpace(FolderQuery))
