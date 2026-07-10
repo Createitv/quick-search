@@ -3,13 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ShutdownMode="OnExplicitShutdown">
   <Application.Resources>
-    <Style TargetType="Button">
-      <Setter Property="Padding" Value="14,8" />
-      <Setter Property="Margin" Value="4" />
-    </Style>
-    <Style TargetType="TextBox">
-      <Setter Property="Padding" Value="10,8" />
-      <Setter Property="Margin" Value="0,5" />
-    </Style>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Themes/ModernTheme.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 </Application>
