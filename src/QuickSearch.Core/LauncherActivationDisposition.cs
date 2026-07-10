@@ -5,4 +5,3 @@ public enum LauncherActivationDisposition
     OpenedMappings,
     ShowLauncher
 }
-
