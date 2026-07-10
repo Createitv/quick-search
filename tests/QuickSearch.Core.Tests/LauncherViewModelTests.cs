@@ -24,6 +24,9 @@ public sealed class LauncherViewModelTests
         Assert.Contains(Path.Combine("clients", "Sales Team"), viewModel.Status);
         Assert.Equal(0, opener.OpenCalls);
         Assert.True(viewModel.CanConfirmOpen);
+        Assert.False(viewModel.IsFolderSearchVisible);
+        Assert.Equal(Path.Combine("clients", "Sales Team"), viewModel.ResolvedPath);
+        Assert.Equal(StatusKind.Success, viewModel.StatusKind);
     }
 
     [Fact]
@@ -39,10 +42,95 @@ public sealed class LauncherViewModelTests
 
         viewModel.ActivateFromClipboard();
         Assert.Contains("重新搜索", viewModel.Status);
+        Assert.True(viewModel.IsFolderSearchVisible);
         viewModel.Alias = "sales-team";
 
         Assert.Equal("sales-team", viewModel.Alias);
         Assert.Equal("sales", viewModel.FolderQuery);
+    }
+
+    [Fact]
+    public async Task AliasChangeToExactMapping_CancelsSearchAndIgnoresLateResults()
+    {
+        var configuration = new AppConfiguration();
+        configuration.UpsertMapping("sales", "/sales");
+        var search = new DeferredFolderSearch();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(configuration),
+            search: search,
+            folderExists: path => path == "/sales",
+            delayAsync: (_, _) => Task.CompletedTask);
+        await viewModel.InitializeAsync();
+        viewModel.Alias = "unknown";
+        var oldRequest = await search.WaitForRequestAsync("unknown");
+
+        viewModel.Alias = "sales";
+
+        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
+        Assert.False(viewModel.IsFolderSearchVisible);
+        var exactStatus = viewModel.Status;
+        oldRequest.Complete([new FolderSearchResult("Late", "/late")]);
+        await oldRequest.Completed;
+        await Task.Yield();
+
+        Assert.Empty(viewModel.Results);
+        Assert.Null(viewModel.SelectedResult);
+        Assert.Equal(exactStatus, viewModel.Status);
+        Assert.True(viewModel.CanConfirmOpen);
+    }
+
+    [Fact]
+    public async Task SameAliasClipboardActivation_InvalidatesPendingSearchResults()
+    {
+        var configuration = new AppConfiguration();
+        configuration.UpsertMapping("sales", "/sales");
+        var search = new DeferredFolderSearch();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(configuration),
+            search: search,
+            clipboard: new FakeClipboardTextReader("sales"),
+            folderExists: path => path == "/sales",
+            delayAsync: (_, _) => Task.CompletedTask);
+        await viewModel.InitializeAsync();
+        viewModel.Alias = "sales";
+        viewModel.FolderQuery = "manual";
+        var oldRequest = await search.WaitForRequestAsync("manual");
+
+        viewModel.ActivateFromClipboard();
+
+        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
+        Assert.False(viewModel.IsFolderSearchVisible);
+        var exactStatus = viewModel.Status;
+        oldRequest.Complete([new FolderSearchResult("Late", "/late")]);
+        await oldRequest.Completed;
+        await Task.Yield();
+
+        Assert.Empty(viewModel.Results);
+        Assert.Equal(exactStatus, viewModel.Status);
+    }
+
+    [Fact]
+    public async Task ClipboardFailureActivation_StillInvalidatesPendingSearchResults()
+    {
+        var search = new DeferredFolderSearch();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            search: search,
+            clipboard: new FakeClipboardTextReader(
+                exception: new InvalidOperationException("clipboard busy")),
+            delayAsync: (_, _) => Task.CompletedTask);
+        await viewModel.InitializeAsync();
+        viewModel.FolderQuery = "old";
+        var oldRequest = await search.WaitForRequestAsync("old");
+
+        viewModel.ActivateFromClipboard();
+
+        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
+        oldRequest.Complete([new FolderSearchResult("Late", "/late")]);
+        await oldRequest.Completed;
+        await Task.Yield();
+        Assert.Empty(viewModel.Results);
+        Assert.Contains("clipboard busy", viewModel.Status);
     }
 
     [Fact]
@@ -205,6 +293,35 @@ public sealed class LauncherViewModelTests
         Assert.Equal("/old-sales", viewModel.Configuration.FindMapping("sales")?.FolderPath);
         Assert.Equal(0, store.SaveCalls);
         Assert.Contains("Explorer failed", viewModel.Status);
+    }
+
+    [Fact]
+    public async Task ConfirmAndOpenAsync_ExactOpenFailureDemotesToRepairWithoutPersisting()
+    {
+        var configuration = new AppConfiguration();
+        configuration.UpsertMapping("sales", "/sales");
+        var store = new FakeMappingStore(configuration);
+        var viewModel = CreateViewModel(
+            store,
+            opener: new FakeFolderOpener(
+                PlatformOperationResult.Failed("Explorer failed")),
+            folderExists: path => path == "/sales",
+            delayAsync: (_, cancellationToken) =>
+                Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken));
+        await viewModel.InitializeAsync();
+        viewModel.Alias = "sales";
+        Assert.False(viewModel.IsFolderSearchVisible);
+
+        await viewModel.ConfirmAndOpenAsync();
+
+        Assert.True(viewModel.IsFolderSearchVisible);
+        Assert.False(viewModel.CanConfirmOpen);
+        Assert.Equal("sales", viewModel.FolderQuery);
+        Assert.Contains("重新搜索", viewModel.Status);
+        Assert.Equal(StatusKind.Error, viewModel.StatusKind);
+        Assert.Equal(string.Empty, viewModel.ResolvedPath);
+        Assert.Equal("/sales", viewModel.Configuration.FindMapping("sales")?.FolderPath);
+        Assert.Equal(0, store.SaveCalls);
     }
 
     [Fact]

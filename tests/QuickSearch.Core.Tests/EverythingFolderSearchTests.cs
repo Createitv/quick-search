@@ -281,6 +281,76 @@ public sealed class EverythingFolderSearchTests
         }
     }
 
+    [Fact]
+    public async Task SearchAsync_CoalescesBlockedRequestsToOneLatestPendingQuery()
+    {
+        var native = new FakeEverythingNative { BlockQuery = true };
+        var search = new EverythingFolderSearch(native);
+        var active = search.SearchAsync("one");
+        await native.QueryStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var droppedTwo = search.SearchAsync("two");
+        var droppedThree = search.SearchAsync("three");
+        var latest = search.SearchAsync("latest");
+
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => droppedTwo.WaitAsync(TimeSpan.FromSeconds(1)));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => droppedThree.WaitAsync(TimeSpan.FromSeconds(1)));
+            Assert.False(latest.IsCompleted);
+            Assert.Equal(1, native.QueryCallCount);
+        }
+        finally
+        {
+            native.ReleaseQuery();
+        }
+
+        await active;
+        await latest;
+
+        Assert.Equal(2, native.QueryCallCount);
+        Assert.Equal(
+            [EverythingQueryBuilder.Build("one"), EverythingQueryBuilder.Build("latest")],
+            native.Searches);
+    }
+
+    [Fact]
+    public async Task ProbeAsync_ReturnsControlAndReportsUnavailableWithoutRunningQuery()
+    {
+        var native = new FakeEverythingNative
+        {
+            BlockDatabaseCheck = true,
+            DatabaseLoaded = false,
+            LastError = 2
+        };
+        var search = new EverythingFolderSearch(native);
+        Task? pendingProbe = null;
+        var callReturned = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _ = Task.Run(() =>
+        {
+            pendingProbe = search.ProbeAsync();
+            callReturned.TrySetResult();
+        });
+        await native.DatabaseCheckStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        try
+        {
+            await callReturned.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            Assert.NotNull(pendingProbe);
+            Assert.False(pendingProbe.IsCompleted);
+        }
+        finally
+        {
+            native.ReleaseDatabaseCheck();
+        }
+
+        await pendingProbe!;
+        Assert.Equal(EverythingHealth.Unavailable, search.Health);
+        Assert.False(native.QueryCalled);
+    }
+
     private sealed class FakeEverythingNative : IEverythingNative
     {
         public uint RequestFlags { get; private set; }
@@ -293,6 +363,13 @@ public sealed class EverythingFolderSearchTests
 
         public bool DatabaseLoaded { get; init; } = true;
 
+        public bool BlockDatabaseCheck { get; init; }
+
+        public TaskCompletionSource DatabaseCheckStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private ManualResetEventSlim DatabaseCheckRelease { get; } = new(initialState: false);
+
         public uint LastError { get; init; }
 
         public bool QueryResult { get; init; } = true;
@@ -300,6 +377,10 @@ public sealed class EverythingFolderSearchTests
         public Exception? QueryException { get; init; }
 
         public bool QueryCalled { get; private set; }
+
+        public int QueryCallCount { get; private set; }
+
+        public List<string> Searches { get; } = [];
 
         public bool BlockQuery { get; init; }
 
@@ -314,6 +395,12 @@ public sealed class EverythingFolderSearchTests
 
         public bool IsDatabaseLoaded()
         {
+            DatabaseCheckStarted.TrySetResult();
+            if (BlockDatabaseCheck)
+            {
+                DatabaseCheckRelease.Wait();
+            }
+
             if (DatabaseException is not null)
             {
                 throw DatabaseException;
@@ -322,8 +409,11 @@ public sealed class EverythingFolderSearchTests
             return DatabaseLoaded;
         }
 
+        public void ReleaseDatabaseCheck() => DatabaseCheckRelease.Set();
+
         public void SetSearch(string search)
         {
+            Searches.Add(search);
         }
 
         public void SetRequestFlags(uint flags) => RequestFlags = flags;
@@ -333,6 +423,7 @@ public sealed class EverythingFolderSearchTests
         public bool Query(bool wait)
         {
             QueryCalled = true;
+            QueryCallCount++;
             QueryStarted.TrySetResult();
             if (BlockQuery)
             {

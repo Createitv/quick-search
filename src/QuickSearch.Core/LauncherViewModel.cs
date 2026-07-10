@@ -16,6 +16,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     private string _alias = string.Empty;
     private string _folderQuery = string.Empty;
     private string _status = "正在初始化…";
+    private StatusKind _statusKind;
     private IReadOnlyList<FolderSearchResult> _results = [];
     private FolderSearchResult? _selectedResult;
     private FolderMapping? _exactMapping;
@@ -43,11 +44,11 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         SearchCommand = new AsyncRelayCommand(
             SearchNowAsync,
             () => !string.IsNullOrWhiteSpace(FolderQuery),
-            exception => Status = $"搜索失败：{exception.Message}");
+            exception => SetStatus($"搜索失败：{exception.Message}", StatusKind.Error));
         ConfirmOpenCommand = new AsyncRelayCommand(
             ConfirmAndOpenAsync,
             () => CanConfirmOpen,
-            exception => Status = $"无法打开文件夹：{exception.Message}");
+            exception => SetStatus($"无法打开文件夹：{exception.Message}", StatusKind.Error));
         HideCommand = new RelayCommand(() => HideRequested?.Invoke(this, EventArgs.Empty));
         ShowSettingsCommand = new RelayCommand(
             () => ShowSettingsRequested?.Invoke(this, EventArgs.Empty));
@@ -76,6 +77,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _alias, value ?? string.Empty))
             {
+                InvalidatePendingSearch();
                 RefreshAliasState();
             }
         }
@@ -100,6 +102,12 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _status, value);
     }
 
+    public StatusKind StatusKind
+    {
+        get => _statusKind;
+        private set => SetProperty(ref _statusKind, value);
+    }
+
     public IReadOnlyList<FolderSearchResult> Results
     {
         get => _results;
@@ -114,12 +122,18 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedResult, value))
             {
                 NotifyConfirmStateChanged();
+                OnPropertyChanged(nameof(ResolvedPath));
             }
         }
     }
 
     public string ShortcutInstruction =>
         $"复制邮箱别名后按 {Configuration.Settings.GlobalShortcut}";
+
+    public string ResolvedPath =>
+        _exactMapping?.FolderPath ?? SelectedResult?.FullPath ?? string.Empty;
+
+    public bool IsFolderSearchVisible => _exactMapping is null;
 
     public bool CanConfirmOpen =>
         !string.IsNullOrWhiteSpace(Alias)
@@ -142,36 +156,44 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
         catch (OperationCanceledException)
         {
-            Status = "配置加载已取消。";
+            SetStatus("配置加载已取消。", StatusKind.Neutral);
         }
         catch (Exception exception)
         {
-            Status = $"无法加载配置：{exception.Message}";
+            SetStatus($"无法加载配置：{exception.Message}", StatusKind.Error);
         }
     }
 
     public void ActivateFromClipboard()
     {
+        InvalidatePendingSearch();
         try
         {
             var result = _clipboard.ReadText();
             if (!result.Success)
             {
-                Status = result.Message;
+                SetStatus(result.Message, StatusKind.Error);
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(result.Value))
             {
-                Status = "剪贴板中没有可用的邮箱别名，请手动输入。";
+                SetStatus("剪贴板中没有可用的邮箱别名，请手动输入。", StatusKind.Neutral);
                 return;
             }
 
-            Alias = result.Value;
+            if (string.Equals(Alias, result.Value, StringComparison.Ordinal))
+            {
+                RefreshAliasState();
+            }
+            else
+            {
+                Alias = result.Value;
+            }
         }
         catch (Exception exception)
         {
-            Status = $"无法读取剪贴板：{exception.Message}";
+            SetStatus($"无法读取剪贴板：{exception.Message}", StatusKind.Error);
         }
     }
 
@@ -184,7 +206,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             Results = [];
             SelectedResult = null;
-            Status = "请输入文件夹名称。";
+            SetStatus("请输入文件夹名称。", StatusKind.Neutral);
             return Task.CompletedTask;
         }
 
@@ -195,7 +217,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     {
         Interlocked.Increment(ref _searchGeneration);
         CancelCurrentSearch();
-        Status = "搜索已取消。";
+        SetStatus("搜索已取消。", StatusKind.Neutral);
     }
 
     public async Task ConfirmAndOpenAsync()
@@ -206,14 +228,14 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            Status = "请输入邮箱别名。";
+            SetStatus("请输入邮箱别名。", StatusKind.Neutral);
             return;
         }
 
         var path = _exactMapping?.FolderPath ?? SelectedResult?.FullPath;
         if (path is null)
         {
-            Status = "请先搜索并选择一个文件夹。";
+            SetStatus("请先搜索并选择一个文件夹。", StatusKind.Neutral);
             return;
         }
 
@@ -224,13 +246,13 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            Status = $"无法打开文件夹：{exception.Message}";
+            HandleOpenFailure(alias, $"无法打开文件夹：{exception.Message}");
             return;
         }
 
         if (!openResult.Success)
         {
-            Status = openResult.Message;
+            HandleOpenFailure(alias, openResult.Message);
             return;
         }
 
@@ -247,7 +269,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
-            Status = $"文件夹已打开，但无法保存映射：{exception.Message}";
+            SetStatus($"文件夹已打开，但无法保存映射：{exception.Message}", StatusKind.Error);
             return;
         }
 
@@ -265,7 +287,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     public void ReportStatus(string message)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        Status = message;
+        SetStatus(message, StatusKind.Error);
     }
 
     public void Dispose()
@@ -284,10 +306,11 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         _exactMapping = null;
         Results = [];
         SelectedResult = null;
+        NotifyResolutionStateChanged();
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            Status = "请先复制或输入邮箱别名。";
+            SetStatus("请先复制或输入邮箱别名。", StatusKind.Neutral);
             NotifyConfirmStateChanged();
             return;
         }
@@ -298,14 +321,17 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             _exactMapping = mapping;
             var folderName = Path.GetFileName(
                 mapping.FolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            Status = $"已找到保存的映射：{mapping.Alias} → {folderName}\n{mapping.FolderPath}\n请确认后打开。";
+            SetStatus($"已找到保存的映射：{mapping.Alias} → {folderName}\n{mapping.FolderPath}\n请确认后打开。", StatusKind.Success);
+            NotifyResolutionStateChanged();
             NotifyConfirmStateChanged();
             return;
         }
 
-        Status = mapping is null
-            ? "首次使用这个别名，请输入真实文件夹名称并搜索。"
-            : "保存的文件夹已经不存在，请重新搜索并修复映射。";
+        SetStatus(
+            mapping is null
+                ? "首次使用这个别名，请输入真实文件夹名称并搜索。"
+                : "保存的文件夹已经不存在，请重新搜索并修复映射。",
+            mapping is null ? StatusKind.Neutral : StatusKind.Error);
         if (string.IsNullOrWhiteSpace(FolderQuery))
         {
             FolderQuery = alias;
@@ -342,14 +368,14 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             if (IsCurrentSearch(generation))
             {
-                Status = "搜索已取消。";
+                SetStatus("搜索已取消。", StatusKind.Neutral);
             }
         }
         catch (Exception exception)
         {
             if (IsCurrentSearch(generation))
             {
-                Status = $"Everything 查询失败：{exception.Message}";
+                SetStatus($"Everything 查询失败：{exception.Message}", StatusKind.Error);
             }
         }
     }
@@ -361,7 +387,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     {
         if (IsCurrentSearch(generation))
         {
-            Status = "正在通过 Everything 搜索…";
+            SetStatus("正在通过 Everything 搜索…", StatusKind.Neutral);
         }
 
         try
@@ -375,13 +401,17 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
             Results = results.Take(20).ToArray();
             SelectedResult = Results.FirstOrDefault();
-            Status = FormatSearchStatus(_search.Health, Results.Count, _search.FailureMessage);
+            SetStatus(
+                FormatSearchStatus(_search.Health, Results.Count, _search.FailureMessage),
+                _search.Health == EverythingHealth.Ready
+                    ? Results.Count > 0 ? StatusKind.Success : StatusKind.Neutral
+                    : StatusKind.Error);
         }
         catch (OperationCanceledException)
         {
             if (IsCurrentSearch(generation))
             {
-                Status = "搜索已取消。";
+                SetStatus("搜索已取消。", StatusKind.Neutral);
             }
         }
         catch (Exception exception)
@@ -390,7 +420,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             {
                 Results = [];
                 SelectedResult = null;
-                Status = $"Everything 查询失败：{exception.Message}";
+                SetStatus($"Everything 查询失败：{exception.Message}", StatusKind.Error);
             }
         }
     }
@@ -435,6 +465,45 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(CanConfirmOpen));
         ConfirmOpenCommand.NotifyCanExecuteChanged();
+    }
+
+    private void HandleOpenFailure(string alias, string message)
+    {
+        if (_exactMapping is null)
+        {
+            SetStatus(message, StatusKind.Error);
+            return;
+        }
+
+        _exactMapping = null;
+        Results = [];
+        SelectedResult = null;
+        if (string.IsNullOrWhiteSpace(FolderQuery))
+        {
+            FolderQuery = alias;
+        }
+
+        SetStatus($"{message} 保存的路径无法打开，请重新搜索并修复映射。", StatusKind.Error);
+        NotifyResolutionStateChanged();
+        NotifyConfirmStateChanged();
+    }
+
+    private void InvalidatePendingSearch()
+    {
+        Interlocked.Increment(ref _searchGeneration);
+        CancelCurrentSearch();
+    }
+
+    private void NotifyResolutionStateChanged()
+    {
+        OnPropertyChanged(nameof(ResolvedPath));
+        OnPropertyChanged(nameof(IsFolderSearchVisible));
+    }
+
+    private void SetStatus(string status, StatusKind kind)
+    {
+        Status = status;
+        StatusKind = kind;
     }
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);

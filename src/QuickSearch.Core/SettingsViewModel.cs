@@ -12,6 +12,7 @@ public sealed class SettingsViewModel : ObservableObject
     private string _shortcut = string.Empty;
     private bool _startWithWindows;
     private string _everythingHealthText = string.Empty;
+    private EverythingHealth _everythingHealth;
     private string _message = string.Empty;
     private MappingEditorViewModel? _selectedMapping;
     private bool _isSaving;
@@ -70,6 +71,12 @@ public sealed class SettingsViewModel : ObservableObject
         private set => SetProperty(ref _everythingHealthText, value);
     }
 
+    public EverythingHealth EverythingHealth
+    {
+        get => _everythingHealth;
+        private set => SetProperty(ref _everythingHealth, value);
+    }
+
     public string Message
     {
         get => _message;
@@ -123,6 +130,26 @@ public sealed class SettingsViewModel : ObservableObject
         SelectedMapping = null;
         Message = string.Empty;
         RefreshEverythingHealth();
+    }
+
+    public async Task BeginEditAsync(CancellationToken cancellationToken = default)
+    {
+        BeginEdit();
+        try
+        {
+            await _search.ProbeAsync(cancellationToken);
+            RefreshEverythingHealth();
+        }
+        catch (OperationCanceledException)
+        {
+            EverythingHealth = EverythingHealth.NotReady;
+            EverythingHealthText = "Everything 状态检查已取消。";
+        }
+        catch (Exception exception)
+        {
+            EverythingHealth = EverythingHealth.QueryFailed;
+            EverythingHealthText = $"Everything 状态检查失败：{exception.Message}";
+        }
     }
 
     public void AddMapping()
@@ -212,6 +239,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     public void RefreshEverythingHealth()
     {
+        EverythingHealth = _search.Health;
         EverythingHealthText = _search.Health switch
         {
             EverythingHealth.Ready => "Everything 已就绪。",

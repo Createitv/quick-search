@@ -1,6 +1,7 @@
 <Window x:Class="QuickSearch.Windows.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
         Title="QuickSearch" Icon="Assets/QuickSearch.ico" Width="700" Height="600"
         MinWidth="620" MinHeight="520"
         WindowStartupLocation="CenterScreen"
@@ -47,7 +48,7 @@
                 <Ellipse Width="7" Height="7"
                          Margin="0,0,7,0"
                          VerticalAlignment="Center"
-                         Fill="{DynamicResource SignalCyanBrush}" />
+                         Fill="{DynamicResource SlateBrush}" />
                 <TextBlock Text="Everything 搜索"
                            FontSize="12"
                            FontWeight="SemiBold"
@@ -72,6 +73,7 @@
             <StackPanel>
               <TextBlock Text="邮箱别名" Style="{StaticResource FieldLabelStyle}" />
               <TextBox x:Name="AliasBox"
+                       AutomationProperties.Name="邮箱别名"
                        FontSize="16"
                        Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" />
             </StackPanel>
@@ -95,28 +97,40 @@
 
           <Border Grid.Column="2" Style="{StaticResource SurfaceCardStyle}" Padding="14,12">
             <StackPanel>
-              <TextBlock Text="真实文件夹名称" Style="{StaticResource FieldLabelStyle}" />
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0"
-                         FontSize="16"
-                         Text="{Binding FolderQuery, UpdateSourceTrigger=PropertyChanged}">
-                  <TextBox.InputBindings>
-                    <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
-                  </TextBox.InputBindings>
-                </TextBox>
-                <Button Grid.Column="1"
-                        Margin="8,0,0,0"
-                        Content="搜索"
-                        Command="{Binding SearchCommand}" />
-              </Grid>
+              <StackPanel>
+                <StackPanel.Style>
+                  <Style TargetType="StackPanel">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding IsFolderSearchVisible}" Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </StackPanel.Style>
+                <TextBlock Text="真实文件夹名称" Style="{StaticResource FieldLabelStyle}" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <TextBox Grid.Column="0"
+                           AutomationProperties.Name="真实文件夹名称"
+                           FontSize="16"
+                           Text="{Binding FolderQuery, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.InputBindings>
+                      <KeyBinding Key="Enter" Command="{Binding SearchCommand}" />
+                    </TextBox.InputBindings>
+                  </TextBox>
+                  <Button Grid.Column="1"
+                          Margin="8,0,0,0"
+                          Content="搜索"
+                          Command="{Binding SearchCommand}" />
+                </Grid>
+              </StackPanel>
               <TextBlock Margin="2,7,2,0"
-                         MaxHeight="36"
-                         Text="{Binding SelectedResult.FullPath, TargetNullValue=候选路径将在此显示}"
-                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding ResolvedPath}"
+                         TextWrapping="Wrap"
                          Foreground="{DynamicResource SlateBrush}"
                          FontSize="11" />
             </StackPanel>
@@ -126,8 +140,20 @@
         <Border Grid.Row="2"
                 Margin="0,0,0,16"
                 Padding="13,10"
-                Background="{DynamicResource SoftCyanBrush}"
                 CornerRadius="10">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="Background" Value="{DynamicResource MutedSurfaceBrush}" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static core:StatusKind.Success}">
+                  <Setter Property="Background" Value="{DynamicResource SoftCyanBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static core:StatusKind.Error}">
+                  <Setter Property="Background" Value="{DynamicResource SoftErrorBrush}" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -135,8 +161,21 @@
             </Grid.ColumnDefinitions>
             <Ellipse Width="8" Height="8"
                      Margin="0,1,10,0"
-                     VerticalAlignment="Top"
-                     Fill="{DynamicResource SignalCyanBrush}" />
+                     VerticalAlignment="Top">
+              <Ellipse.Style>
+                <Style TargetType="Ellipse">
+                  <Setter Property="Fill" Value="{DynamicResource SlateBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static core:StatusKind.Success}">
+                      <Setter Property="Fill" Value="{DynamicResource SignalCyanBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding StatusKind}" Value="{x:Static core:StatusKind.Error}">
+                      <Setter Property="Fill" Value="{DynamicResource ErrorBrush}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Ellipse.Style>
+            </Ellipse>
             <TextBlock Grid.Column="1"
                        Text="{Binding Status}"
                        TextWrapping="Wrap"
@@ -146,6 +185,16 @@
         </Border>
 
         <Grid Grid.Row="3">
+          <Grid.Style>
+            <Style TargetType="Grid">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFolderSearchVisible}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Grid.Style>
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />

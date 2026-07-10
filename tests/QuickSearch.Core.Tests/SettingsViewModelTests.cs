@@ -103,6 +103,84 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task BeginEditAsync_ProbesHealthOnEveryOpenAndPublishesTransitions()
+    {
+        var search = new FakeFolderSearch
+        {
+            ProbeResults = new Queue<(EverythingHealth Health, string? Message)>(
+            [
+                (EverythingHealth.Ready, null),
+                (EverythingHealth.Unavailable, null)
+            ])
+        };
+        var viewModel = CreateViewModel(
+            CreateConfiguration(),
+            new FakeMappingStore(),
+            search: search);
+
+        await viewModel.BeginEditAsync();
+        Assert.Equal(EverythingHealth.Ready, viewModel.EverythingHealth);
+        Assert.Contains("已就绪", viewModel.EverythingHealthText);
+
+        await viewModel.BeginEditAsync();
+        Assert.Equal(EverythingHealth.Unavailable, viewModel.EverythingHealth);
+        Assert.Contains("无法连接", viewModel.EverythingHealthText);
+        Assert.Equal(2, search.ProbeCalls);
+    }
+
+    [Fact]
+    public void UnavailableHotkeyRegistration_AllowsUnchangedShortcutAndRejectsChange()
+    {
+        var hotkey = new UnavailableHotkeyRegistration(
+            "Ctrl+Alt+F",
+            "hotkey adapter unavailable");
+
+        Assert.True(hotkey.TryReplace("Ctrl+Alt+F").Success);
+        var changed = hotkey.TryReplace("Ctrl+Shift+9");
+
+        Assert.False(changed.Success);
+        Assert.Contains("hotkey adapter unavailable", changed.Message);
+        Assert.Equal("Ctrl+Alt+F", hotkey.ActiveShortcut);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UnavailableHotkeyStillSavesUnrelatedChangesWhenShortcutUnchanged()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var hotkey = new UnavailableHotkeyRegistration(
+            configuration.Settings.GlobalShortcut,
+            "hotkey adapter unavailable");
+        var viewModel = CreateViewModel(configuration, store, hotkey);
+        viewModel.StartWithWindows = false;
+        viewModel.Mappings[0].FolderPath = "/new-sales";
+
+        await viewModel.SaveAsync();
+
+        Assert.False(configuration.Settings.StartWithWindows);
+        Assert.Equal("/new-sales", configuration.FindMapping("sales")?.FolderPath);
+        Assert.Equal(1, store.SaveCalls);
+    }
+
+    [Fact]
+    public async Task SaveAsync_UnavailableHotkeySurfacesChangedShortcutFailure()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var hotkey = new UnavailableHotkeyRegistration(
+            configuration.Settings.GlobalShortcut,
+            "hotkey adapter unavailable");
+        var viewModel = CreateViewModel(configuration, store, hotkey);
+        viewModel.Shortcut = "Ctrl+Shift+9";
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal("Ctrl+Alt+F", configuration.Settings.GlobalShortcut);
+        Assert.Equal(0, store.SaveCalls);
+        Assert.Contains("hotkey adapter unavailable", viewModel.Message);
+    }
+
+    [Fact]
     public async Task SaveAsync_InvalidShortcutKeepsDialogOpenAndDoesNotApplyAnything()
     {
         var configuration = CreateConfiguration();
@@ -351,9 +429,25 @@ public sealed class SettingsViewModelTests
 
     private sealed class FakeFolderSearch : IFolderSearch
     {
-        public EverythingHealth Health { get; init; } = EverythingHealth.Ready;
+        public EverythingHealth Health { get; set; } = EverythingHealth.Ready;
 
-        public string? FailureMessage { get; init; }
+        public string? FailureMessage { get; set; }
+
+        public Queue<(EverythingHealth Health, string? Message)> ProbeResults { get; init; } = [];
+
+        public int ProbeCalls { get; private set; }
+
+        public Task ProbeAsync(CancellationToken cancellationToken = default)
+        {
+            ProbeCalls++;
+            if (ProbeResults.TryDequeue(out var result))
+            {
+                Health = result.Health;
+                FailureMessage = result.Message;
+            }
+
+            return Task.CompletedTask;
+        }
 
         public Task<IReadOnlyList<FolderSearchResult>> SearchAsync(
             string query,

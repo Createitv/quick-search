@@ -10,7 +10,9 @@ public partial class MainWindow : Window, IDisposable
     private readonly IMappingStore _store;
     private readonly IFolderSearch _search;
     private readonly IStartupRegistration _startup;
-    private GlobalHotkey? _hotkey;
+    private IHotkeyRegistration? _hotkey;
+    private GlobalHotkey? _globalHotkey;
+    private string? _hotkeyInitializationFailure;
     private SettingsViewModel? _settingsViewModel;
     private SettingsWindow? _settingsWindow;
     private bool _allowClose;
@@ -62,9 +64,9 @@ public partial class MainWindow : Window, IDisposable
     {
         if (_hotkey is null)
         {
-            _viewModel.ReportStatus("快捷键服务尚未就绪。");
-            ShowLauncher();
-            return;
+            _hotkey = new UnavailableHotkeyRegistration(
+                _viewModel.Configuration.Settings.GlobalShortcut,
+                _hotkeyInitializationFailure ?? "快捷键服务尚未就绪。");
         }
 
         if (_settingsWindow is null)
@@ -82,7 +84,7 @@ public partial class MainWindow : Window, IDisposable
             };
         }
 
-        _settingsViewModel!.BeginEdit();
+        _ = _settingsViewModel!.BeginEditAsync();
         _settingsWindow.Show();
         _settingsWindow.WindowState = WindowState.Normal;
         _settingsWindow.Activate();
@@ -108,10 +110,10 @@ public partial class MainWindow : Window, IDisposable
         }
 
         _settingsWindow?.AllowApplicationExit();
-        if (_hotkey is not null)
+        if (_globalHotkey is not null)
         {
-            _hotkey.Pressed -= Hotkey_Pressed;
-            _hotkey.Dispose();
+            _globalHotkey.Pressed -= Hotkey_Pressed;
+            _globalHotkey.Dispose();
         }
 
         _viewModel.Dispose();
@@ -121,12 +123,14 @@ public partial class MainWindow : Window, IDisposable
     {
         try
         {
-            _hotkey = new GlobalHotkey(this);
-            _hotkey.Pressed += Hotkey_Pressed;
+            _globalHotkey = new GlobalHotkey(this);
+            _globalHotkey.Pressed += Hotkey_Pressed;
+            _hotkey = _globalHotkey;
         }
         catch (Exception exception)
         {
-            _viewModel.ReportStatus($"无法初始化快捷键服务：{exception.Message}");
+            _hotkeyInitializationFailure = $"无法初始化快捷键服务：{exception.Message}";
+            _viewModel.ReportStatus(_hotkeyInitializationFailure);
         }
     }
 
@@ -148,6 +152,9 @@ public partial class MainWindow : Window, IDisposable
 
         if (_hotkey is null)
         {
+            _hotkey = new UnavailableHotkeyRegistration(
+                _viewModel.Configuration.Settings.GlobalShortcut,
+                _hotkeyInitializationFailure ?? "快捷键服务尚未就绪。");
             return;
         }
 
