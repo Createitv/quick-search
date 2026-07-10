@@ -3,6 +3,112 @@ namespace QuickSearch.Core.Tests;
 public sealed class LauncherViewModelTests
 {
     [Fact]
+    public async Task ActivateFromClipboardAsync_OpensEveryValidMappingWithoutShowingLauncher()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("sales", "/sales/current");
+        configuration.AddMapping("sales", "/sales/archive");
+        var store = new FakeMappingStore(configuration);
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(
+            store,
+            clipboard: new FakeClipboardTextReader(" SALES "),
+            opener: opener,
+            folderExists: _ => true);
+        await viewModel.InitializeAsync();
+
+        var disposition = await viewModel.ActivateFromClipboardAsync();
+
+        Assert.Equal(LauncherActivationDisposition.OpenedMappings, disposition);
+        Assert.Equal(["/sales/current", "/sales/archive"], opener.OpenedPaths);
+        Assert.Equal(1, store.SaveCalls);
+        Assert.All(
+            viewModel.Configuration.FindMappings("sales"),
+            mapping => Assert.NotNull(mapping.LastUsedAtUtc));
+    }
+
+    [Fact]
+    public async Task ActivateFromClipboardAsync_UnmappedKeywordSearchesEverythingAndShowsLauncher()
+    {
+        var search = new FakeFolderSearch
+        {
+            Results = [new FolderSearchResult("Sales", "/found/sales")]
+        };
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            search: search,
+            clipboard: new FakeClipboardTextReader("sales"));
+        await viewModel.InitializeAsync();
+
+        var disposition = await viewModel.ActivateFromClipboardAsync();
+
+        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
+        Assert.Equal("sales", viewModel.SearchText);
+        Assert.Equal("/found/sales", viewModel.SelectedResult?.FullPath);
+        Assert.Equal(1, search.SearchCalls);
+    }
+
+    [Fact]
+    public async Task ActivateFromClipboardAsync_EmptyClipboardClearsStaleSearchAndShowsLauncher()
+    {
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            clipboard: new FakeClipboardTextReader("  "));
+        await viewModel.InitializeAsync();
+        viewModel.FolderQuery = "stale";
+        viewModel.SelectedResult = new FolderSearchResult("Stale", "/stale");
+
+        var disposition = await viewModel.ActivateFromClipboardAsync();
+
+        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
+        Assert.Equal(string.Empty, viewModel.SearchText);
+        Assert.Empty(viewModel.Results);
+        Assert.Null(viewModel.SelectedResult);
+    }
+
+    [Fact]
+    public async Task ActivateFromClipboardAsync_PartialMappingFailureOpensValidPathsAndShowsSearch()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddMapping("sales", "/sales/current");
+        configuration.AddMapping("sales", "/sales/missing");
+        var search = new FakeFolderSearch();
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(configuration),
+            search: search,
+            clipboard: new FakeClipboardTextReader("sales"),
+            opener: opener,
+            folderExists: path => path == "/sales/current");
+        await viewModel.InitializeAsync();
+
+        var disposition = await viewModel.ActivateFromClipboardAsync();
+
+        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
+        Assert.Equal(["/sales/current"], opener.OpenedPaths);
+        Assert.Equal("sales", viewModel.SearchText);
+        Assert.Equal(1, search.SearchCalls);
+        Assert.Contains("失效", viewModel.Status);
+    }
+
+    [Fact]
+    public async Task OpenSelectedAsync_OpensSearchResultWithoutCreatingMapping()
+    {
+        var configuration = new AppConfiguration();
+        var store = new FakeMappingStore(configuration);
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(store, opener: opener);
+        await viewModel.InitializeAsync();
+        viewModel.SelectedResult = new FolderSearchResult("Sales", "/found/sales");
+
+        await viewModel.OpenSelectedAsync();
+
+        Assert.Equal(["/found/sales"], opener.OpenedPaths);
+        Assert.Empty(configuration.Mappings);
+        Assert.Equal(0, store.SaveCalls);
+    }
+
+    [Fact]
     public async Task ActivateFromClipboard_ShowsExactMappingAndWaitsForConfirmation()
     {
         var configuration = new AppConfiguration();
@@ -566,20 +672,26 @@ public sealed class LauncherViewModelTests
     private sealed class FakeFolderOpener(
         PlatformOperationResult? result = null,
         List<string>? operations = null,
-        Exception? exception = null) : IFolderOpener
+        Exception? exception = null,
+        Func<string, PlatformOperationResult>? resultForPath = null) : IFolderOpener
     {
         public int OpenCalls { get; private set; }
+
+        public List<string> OpenedPaths { get; } = [];
 
         public PlatformOperationResult Open(string folderPath)
         {
             OpenCalls++;
+            OpenedPaths.Add(folderPath);
             operations?.Add($"open:{folderPath}");
             if (exception is not null)
             {
                 throw exception;
             }
 
-            return result ?? PlatformOperationResult.Succeeded();
+            return resultForPath?.Invoke(folderPath)
+                ?? result
+                ?? PlatformOperationResult.Succeeded();
         }
     }
 

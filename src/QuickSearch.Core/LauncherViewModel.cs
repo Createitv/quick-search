@@ -49,6 +49,10 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             ConfirmAndOpenAsync,
             () => CanConfirmOpen,
             exception => SetStatus($"无法打开文件夹：{exception.Message}", StatusKind.Error));
+        OpenSelectedCommand = new AsyncRelayCommand(
+            OpenSelectedAsync,
+            () => CanOpenSelected,
+            exception => SetStatus($"无法打开文件夹：{exception.Message}", StatusKind.Error));
         HideCommand = new RelayCommand(() => HideRequested?.Invoke(this, EventArgs.Empty));
         ShowSettingsCommand = new RelayCommand(
             () => ShowSettingsRequested?.Invoke(this, EventArgs.Empty));
@@ -90,10 +94,17 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             if (SetProperty(ref _folderQuery, value ?? string.Empty))
             {
+                OnPropertyChanged(nameof(SearchText));
                 SearchCommand.NotifyCanExecuteChanged();
                 QueueDebouncedSearch();
             }
         }
+    }
+
+    public string SearchText
+    {
+        get => FolderQuery;
+        set => FolderQuery = value;
     }
 
     public string Status
@@ -122,13 +133,15 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             if (SetProperty(ref _selectedResult, value))
             {
                 NotifyConfirmStateChanged();
+                OnPropertyChanged(nameof(CanOpenSelected));
+                OpenSelectedCommand.NotifyCanExecuteChanged();
                 OnPropertyChanged(nameof(ResolvedPath));
             }
         }
     }
 
     public string ShortcutInstruction =>
-        $"复制邮箱别名后按 {Configuration.Settings.GlobalShortcut}";
+        $"复制关键词后按 {Configuration.Settings.GlobalShortcut}";
 
     public string ResolvedPath =>
         _exactMapping?.FolderPath ?? SelectedResult?.FullPath ?? string.Empty;
@@ -139,9 +152,13 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         !string.IsNullOrWhiteSpace(Alias)
         && (_exactMapping is not null || SelectedResult is not null);
 
+    public bool CanOpenSelected => SelectedResult is not null;
+
     public AsyncRelayCommand SearchCommand { get; }
 
     public AsyncRelayCommand ConfirmOpenCommand { get; }
+
+    public AsyncRelayCommand OpenSelectedCommand { get; }
 
     public RelayCommand HideCommand { get; }
 
@@ -195,6 +212,108 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             SetStatus($"无法读取剪贴板：{exception.Message}", StatusKind.Error);
         }
+    }
+
+    public async Task<LauncherActivationDisposition> ActivateFromClipboardAsync()
+    {
+        ThrowIfDisposed();
+        InvalidatePendingSearch();
+        PlatformOperationResult<string?> clipboardResult;
+        try
+        {
+            clipboardResult = _clipboard.ReadText();
+        }
+        catch (Exception exception)
+        {
+            ClearSearchText();
+            SetStatus($"无法读取剪贴板：{exception.Message}", StatusKind.Error);
+            return LauncherActivationDisposition.ShowLauncher;
+        }
+
+        if (!clipboardResult.Success)
+        {
+            ClearSearchText();
+            SetStatus(clipboardResult.Message, StatusKind.Error);
+            return LauncherActivationDisposition.ShowLauncher;
+        }
+
+        var keyword = clipboardResult.Value?.Trim() ?? string.Empty;
+        if (keyword.Length == 0)
+        {
+            ClearSearchText();
+            SetStatus("输入关键词，通过 Everything 搜索文件夹。", StatusKind.Neutral);
+            return LauncherActivationDisposition.ShowLauncher;
+        }
+
+        var mappings = Configuration.FindMappings(keyword);
+        if (mappings.Count == 0)
+        {
+            await SearchKeywordAsync(keyword);
+            return LauncherActivationDisposition.ShowLauncher;
+        }
+
+        var openedPaths = new List<string>();
+        var failures = new List<string>();
+        foreach (var mapping in mappings)
+        {
+            if (!_folderExists(mapping.FolderPath))
+            {
+                failures.Add($"失效：{mapping.FolderPath}");
+                continue;
+            }
+
+            PlatformOperationResult openResult;
+            try
+            {
+                openResult = _opener.Open(mapping.FolderPath);
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"{mapping.FolderPath}：{exception.Message}");
+                continue;
+            }
+
+            if (openResult.Success)
+            {
+                openedPaths.Add(mapping.FolderPath);
+            }
+            else
+            {
+                failures.Add($"{mapping.FolderPath}：{openResult.Message}");
+            }
+        }
+
+        if (openedPaths.Count > 0)
+        {
+            var candidate = Configuration.Clone();
+            foreach (var openedPath in openedPaths)
+            {
+                candidate.MarkMappingUsed(keyword, openedPath);
+            }
+
+            try
+            {
+                await _store.SaveAsync(candidate);
+                Configuration.ReplaceWith(candidate);
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"使用时间保存失败：{exception.Message}");
+            }
+        }
+
+        if (failures.Count == 0)
+        {
+            SetStatus($"已打开 {openedPaths.Count} 个映射文件夹。", StatusKind.Success);
+            HideRequested?.Invoke(this, EventArgs.Empty);
+            return LauncherActivationDisposition.OpenedMappings;
+        }
+
+        await SearchKeywordAsync(keyword);
+        SetStatus(
+            $"已打开 {openedPaths.Count} 个文件夹；{string.Join("；", failures)}",
+            StatusKind.Error);
+        return LauncherActivationDisposition.ShowLauncher;
     }
 
     public Task SearchNowAsync()
@@ -278,6 +397,38 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         HideRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    public Task OpenSelectedAsync()
+    {
+        ThrowIfDisposed();
+        Interlocked.Increment(ref _searchGeneration);
+        CancelCurrentSearch();
+        var path = SelectedResult?.FullPath;
+        if (path is null)
+        {
+            SetStatus("请先选择一个文件夹。", StatusKind.Neutral);
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            var result = _opener.Open(path);
+            if (!result.Success)
+            {
+                SetStatus(result.Message, StatusKind.Error);
+                return Task.CompletedTask;
+            }
+        }
+        catch (Exception exception)
+        {
+            SetStatus($"无法打开文件夹：{exception.Message}", StatusKind.Error);
+            return Task.CompletedTask;
+        }
+
+        SetStatus($"已打开：{path}", StatusKind.Success);
+        HideRequested?.Invoke(this, EventArgs.Empty);
+        return Task.CompletedTask;
+    }
+
     public void RefreshConfiguration()
     {
         OnPropertyChanged(nameof(ShortcutInstruction));
@@ -352,6 +503,19 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
 
         _ = DebounceAndSearchAsync(query, generation, cancellation.Token);
+    }
+
+    private async Task SearchKeywordAsync(string keyword)
+    {
+        SearchText = keyword;
+        await SearchNowAsync();
+    }
+
+    private void ClearSearchText()
+    {
+        SearchText = string.Empty;
+        Results = [];
+        SelectedResult = null;
     }
 
     private async Task DebounceAndSearchAsync(

@@ -3,7 +3,7 @@ namespace QuickSearch.Core.Tests;
 public sealed class JsonMappingStoreTests
 {
     [Fact]
-    public async Task LoadAsync_CanonicalizesDuplicateAliasesWithLastEntryWinning()
+    public async Task LoadAsync_PreservesMultipleFoldersForSameKeyword()
     {
         using var tempDirectory = new TempDirectory();
         var configPath = Path.Combine(tempDirectory.Path, "config.json");
@@ -28,9 +28,10 @@ public sealed class JsonMappingStoreTests
 
         var configuration = await store.LoadAsync();
 
-        var mapping = Assert.Single(configuration.Mappings);
-        Assert.Equal("SALES\tTEAM", mapping.Alias);
-        Assert.Equal(@"D:\Sales\Current", mapping.FolderPath);
+        Assert.Equal(2, configuration.FindMappings("sales team").Count);
+        Assert.Equal(
+            [@"C:\Sales\Old", @"D:\Sales\Current"],
+            configuration.Mappings.Select(mapping => mapping.FolderPath));
     }
 
     [Fact]
