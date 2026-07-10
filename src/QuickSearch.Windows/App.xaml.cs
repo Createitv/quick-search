@@ -70,7 +70,8 @@ public partial class App : System.Windows.Application
 
         var activationController = new SingleInstanceActivationController(_singleInstance);
         var primaryResult = activationController.Start(
-            () => Dispatcher.BeginInvoke(_mainWindow.ActivateFromClipboard));
+            () => Dispatcher.BeginInvoke(async () =>
+                await _mainWindow.ActivateFromClipboardAsync()));
         if (!primaryResult.Operation.Success)
         {
             _mainWindow.ReportStatus(primaryResult.Operation.Message);
@@ -79,7 +80,7 @@ public partial class App : System.Windows.Application
         InitializeTray();
         if (!backgroundRequested)
         {
-            _mainWindow.ActivateFromClipboard();
+            await _mainWindow.ActivateFromClipboardAsync();
         }
     }
 

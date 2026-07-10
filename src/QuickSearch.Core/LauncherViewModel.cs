@@ -53,6 +53,8 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             OpenSelectedAsync,
             () => CanOpenSelected,
             exception => SetStatus($"无法打开文件夹：{exception.Message}", StatusKind.Error));
+        SelectPreviousCommand = new RelayCommand(SelectPreviousResult);
+        SelectNextCommand = new RelayCommand(SelectNextResult);
         HideCommand = new RelayCommand(() => HideRequested?.Invoke(this, EventArgs.Empty));
         ShowSettingsCommand = new RelayCommand(
             () => ShowSettingsRequested?.Invoke(this, EventArgs.Empty));
@@ -163,6 +165,10 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     public RelayCommand HideCommand { get; }
 
     public RelayCommand ShowSettingsCommand { get; }
+
+    public RelayCommand SelectPreviousCommand { get; }
+
+    public RelayCommand SelectNextCommand { get; }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
@@ -427,6 +433,45 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         SetStatus($"已打开：{path}", StatusKind.Success);
         HideRequested?.Invoke(this, EventArgs.Empty);
         return Task.CompletedTask;
+    }
+
+    private void SelectPreviousResult()
+    {
+        if (Results.Count == 0)
+        {
+            return;
+        }
+
+        var index = SelectedResult is null
+            ? 0
+            : FindSelectedResultIndex();
+        SelectedResult = Results[Math.Max(0, index - 1)];
+    }
+
+    private void SelectNextResult()
+    {
+        if (Results.Count == 0)
+        {
+            return;
+        }
+
+        var index = SelectedResult is null
+            ? -1
+            : FindSelectedResultIndex();
+        SelectedResult = Results[Math.Min(Results.Count - 1, index + 1)];
+    }
+
+    private int FindSelectedResultIndex()
+    {
+        for (var index = 0; index < Results.Count; index++)
+        {
+            if (ReferenceEquals(Results[index], SelectedResult))
+            {
+                return index;
+            }
+        }
+
+        return 0;
     }
 
     public void RefreshConfiguration()

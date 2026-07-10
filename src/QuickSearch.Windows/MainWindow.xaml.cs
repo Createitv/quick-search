@@ -44,10 +44,17 @@ public partial class MainWindow : Window, IDisposable
         ApplyInitialPlatformSettings();
     }
 
-    public void ActivateFromClipboard()
+    public async Task ActivateFromClipboardAsync()
     {
-        _viewModel.ActivateFromClipboard();
-        ShowLauncher();
+        var disposition = await _viewModel.ActivateFromClipboardAsync();
+        if (disposition == LauncherActivationDisposition.ShowLauncher)
+        {
+            ShowLauncher();
+        }
+        else
+        {
+            Hide();
+        }
     }
 
     public void ShowLauncher()
@@ -57,7 +64,7 @@ public partial class MainWindow : Window, IDisposable
         Activate();
         Topmost = true;
         Topmost = false;
-        FocusAlias();
+        FocusSearch();
     }
 
     public void ShowSettings()
@@ -173,8 +180,8 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void Hotkey_Pressed(object? sender, EventArgs e) =>
-        Dispatcher.BeginInvoke(ActivateFromClipboard);
+    private async void Hotkey_Pressed(object? sender, EventArgs e) =>
+        await ActivateFromClipboardAsync();
 
     private void ViewModel_HideRequested(object? sender, EventArgs e) => Hide();
 
@@ -183,12 +190,12 @@ public partial class MainWindow : Window, IDisposable
     private void SettingsViewModel_Saved(object? sender, EventArgs e) =>
         _viewModel.RefreshConfiguration();
 
-    private void Window_Activated(object sender, EventArgs e) => FocusAlias();
+    private void Window_Activated(object sender, EventArgs e) => FocusSearch();
 
-    private void FocusAlias()
+    private void FocusSearch()
     {
-        AliasBox.Focus();
-        AliasBox.SelectAll();
+        SearchBox.Focus();
+        SearchBox.SelectAll();
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)

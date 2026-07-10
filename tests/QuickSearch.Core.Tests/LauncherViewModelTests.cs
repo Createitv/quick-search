@@ -304,6 +304,37 @@ public sealed class LauncherViewModelTests
         Assert.Same(viewModel.Results[0], viewModel.SelectedResult);
     }
 
+    [Fact]
+    public async Task SelectionCommands_MoveWithinSearchResultsWithoutWrapping()
+    {
+        var search = new FakeFolderSearch
+        {
+            Results =
+            [
+                new FolderSearchResult("One", "/one"),
+                new FolderSearchResult("Two", "/two"),
+                new FolderSearchResult("Three", "/three")
+            ]
+        };
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            search: search);
+        await viewModel.InitializeAsync();
+        viewModel.SearchText = "folder";
+        await viewModel.SearchNowAsync();
+
+        viewModel.SelectPreviousCommand.Execute(null);
+        Assert.Equal("/one", viewModel.SelectedResult?.FullPath);
+
+        viewModel.SelectNextCommand.Execute(null);
+        viewModel.SelectNextCommand.Execute(null);
+        viewModel.SelectNextCommand.Execute(null);
+        Assert.Equal("/three", viewModel.SelectedResult?.FullPath);
+
+        viewModel.SelectPreviousCommand.Execute(null);
+        Assert.Equal("/two", viewModel.SelectedResult?.FullPath);
+    }
+
     public static TheoryData<EverythingHealth, IReadOnlyList<FolderSearchResult>, string> SearchStatuses =>
         new()
         {

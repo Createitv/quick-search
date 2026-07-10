@@ -34,7 +34,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,20">
           <TextBlock Text="设置" Style="{StaticResource WindowTitleStyle}" />
           <TextBlock Margin="0,4,0,0"
-                     Text="管理启动方式、快捷键和别名映射"
+                     Text="管理启动方式、快捷键和关键词映射"
                      Style="{StaticResource SecondaryTextStyle}" />
         </StackPanel>
 
@@ -138,7 +138,7 @@
           </Grid.RowDefinitions>
           <Grid Margin="0,0,0,10">
             <StackPanel>
-              <TextBlock Text="别名映射" Style="{StaticResource SectionTitleStyle}" />
+              <TextBlock Text="关键词映射" Style="{StaticResource SectionTitleStyle}" />
               <TextBlock Margin="0,3,0,0"
                          Text="修改在保存前不会生效"
                          Style="{StaticResource SecondaryTextStyle}" />
@@ -158,7 +158,7 @@
               <ColumnDefinition Width="16" />
               <ColumnDefinition Width="7*" />
             </Grid.ColumnDefinitions>
-            <TextBlock Text="别名" Style="{StaticResource FieldLabelStyle}" Margin="0" />
+            <TextBlock Text="关键词" Style="{StaticResource FieldLabelStyle}" Margin="0" />
             <TextBlock Grid.Column="2" Text="文件夹路径" Style="{StaticResource FieldLabelStyle}" Margin="0" />
           </Grid>
           <ListBox Grid.Row="2"
@@ -174,7 +174,7 @@
                     <ColumnDefinition Width="7*" />
                   </Grid.ColumnDefinitions>
                   <TextBox Grid.Column="0"
-                           AutomationProperties.Name="映射别名"
+                           AutomationProperties.Name="映射关键词"
                            Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" />
                   <TextBox Grid.Column="2"
                            AutomationProperties.Name="映射文件夹路径"
