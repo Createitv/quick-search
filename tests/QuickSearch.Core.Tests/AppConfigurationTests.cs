@@ -3,6 +3,12 @@ namespace QuickSearch.Core.Tests;
 public sealed class AppConfigurationTests
 {
     [Fact]
+    public void AppSettings_DefaultsSchemaVersionToOne()
+    {
+        Assert.Equal(1, new AppSettings().SchemaVersion);
+    }
+
+    [Fact]
     public void DirectConstruction_CanonicalizesDuplicateAliasesWithLastEntryWinning()
     {
         var configuration = new AppConfiguration
@@ -77,6 +83,75 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
+    public void UpsertMapping_UsesDeterministicCreationAndUpdateMetadata()
+    {
+        var createdAtUtc = new DateTimeOffset(
+            2026,
+            7,
+            10,
+            1,
+            2,
+            3,
+            TimeSpan.Zero);
+        var updatedAtUtc = createdAtUtc.AddHours(2);
+        var timeProvider = new SettableTimeProvider(createdAtUtc);
+        var configuration = new AppConfiguration(timeProvider);
+
+        var created = configuration.UpsertMapping(
+            "Sales Team",
+            @"C:\Sales\Old");
+
+        Assert.Equal(createdAtUtc, created.CreatedAtUtc);
+        Assert.Equal(createdAtUtc, created.UpdatedAtUtc);
+        Assert.Null(created.LastUsedAtUtc);
+
+        timeProvider.UtcNow = updatedAtUtc;
+        var updated = configuration.UpsertMapping(
+            "  SALES\tteam  ",
+            @"D:\Sales\Current");
+
+        Assert.Equal(createdAtUtc, updated.CreatedAtUtc);
+        Assert.Equal(updatedAtUtc, updated.UpdatedAtUtc);
+        Assert.Null(updated.LastUsedAtUtc);
+    }
+
+    [Fact]
+    public void MarkMappingUsed_UpdatesLastUsedAndUpsertPreservesIt()
+    {
+        var createdAtUtc = new DateTimeOffset(
+            2026,
+            7,
+            10,
+            1,
+            2,
+            3,
+            TimeSpan.Zero);
+        var usedAtUtc = createdAtUtc.AddMinutes(15);
+        var updatedAtUtc = createdAtUtc.AddHours(2);
+        var timeProvider = new SettableTimeProvider(createdAtUtc);
+        var configuration = new AppConfiguration(timeProvider);
+        configuration.UpsertMapping("Sales Team", @"C:\Sales\Old");
+
+        timeProvider.UtcNow = usedAtUtc;
+        var used = configuration.MarkMappingUsed("  SALES\tteam  ");
+
+        Assert.NotNull(used);
+        Assert.Equal(createdAtUtc, used.CreatedAtUtc);
+        Assert.Equal(createdAtUtc, used.UpdatedAtUtc);
+        Assert.Equal(usedAtUtc, used.LastUsedAtUtc);
+        Assert.Same(used, configuration.FindMapping("sales team"));
+
+        timeProvider.UtcNow = updatedAtUtc;
+        var updated = configuration.UpsertMapping(
+            "Sales Team",
+            @"D:\Sales\Current");
+
+        Assert.Equal(createdAtUtc, updated.CreatedAtUtc);
+        Assert.Equal(updatedAtUtc, updated.UpdatedAtUtc);
+        Assert.Equal(usedAtUtc, updated.LastUsedAtUtc);
+    }
+
+    [Fact]
     public void RemoveMapping_RemovesByNormalizedAliasWithoutExposingTheCollection()
     {
         var configuration = new AppConfiguration();
@@ -103,5 +178,12 @@ public sealed class AppConfigurationTests
         Assert.Equal(
             ["Northwind Billing", "Northwind Invoices"],
             mappings.Select(mapping => mapping.Alias));
+    }
+
+    private sealed class SettableTimeProvider(DateTimeOffset utcNow) : TimeProvider
+    {
+        public DateTimeOffset UtcNow { get; set; } = utcNow;
+
+        public override DateTimeOffset GetUtcNow() => UtcNow;
     }
 }

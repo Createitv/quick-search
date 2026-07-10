@@ -73,6 +73,51 @@ public sealed class JsonMappingStoreTests
     }
 
     [Fact]
+    public async Task SaveAndLoad_RoundTripsSchemaAndMappingMetadata()
+    {
+        using var tempDirectory = new TempDirectory();
+        var configPath = Path.Combine(tempDirectory.Path, "config.json");
+        IMappingStore store = new JsonMappingStore(configPath);
+        var createdAtUtc = new DateTimeOffset(
+            2026,
+            7,
+            8,
+            9,
+            10,
+            11,
+            TimeSpan.Zero);
+        var updatedAtUtc = createdAtUtc.AddDays(1);
+        var lastUsedAtUtc = updatedAtUtc.AddMinutes(30);
+        var configuration = new AppConfiguration
+        {
+            Settings = new AppSettings
+            {
+                SchemaVersion = 3,
+                GlobalShortcut = "Ctrl+Shift+G",
+                StartWithWindows = false
+            },
+            Mappings =
+            [
+                new FolderMapping(
+                    "Northwind Billing",
+                    @"C:\Clients\Northwind",
+                    createdAtUtc,
+                    updatedAtUtc,
+                    lastUsedAtUtc)
+            ]
+        };
+
+        await store.SaveAsync(configuration);
+        var loaded = await store.LoadAsync();
+
+        Assert.Equal(3, loaded.Settings.SchemaVersion);
+        var mapping = Assert.Single(loaded.Mappings);
+        Assert.Equal(createdAtUtc, mapping.CreatedAtUtc);
+        Assert.Equal(updatedAtUtc, mapping.UpdatedAtUtc);
+        Assert.Equal(lastUsedAtUtc, mapping.LastUsedAtUtc);
+    }
+
+    [Fact]
     public async Task SaveAsync_AtomicallyReplacesTheExistingConfigFile()
     {
         using var tempDirectory = new TempDirectory();
