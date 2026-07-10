@@ -5,10 +5,10 @@ using QuickSearch.Core;
 
 namespace QuickSearch.Windows;
 
-public sealed partial class GlobalHotkey : IDisposable
+public sealed partial class GlobalHotkey : IHotkeyRegistration, IDisposable
 {
-    private const int HotkeyId = 0x5146;
     private readonly HwndSource _source;
+    private readonly HotkeyRegistrationController _registrations;
 
     public event EventHandler? Pressed;
 
@@ -18,43 +18,55 @@ public sealed partial class GlobalHotkey : IDisposable
         _source = HwndSource.FromHwnd(handle)
                   ?? throw new InvalidOperationException("Window handle is unavailable.");
         _source.AddHook(WindowProc);
+        _registrations = new HotkeyRegistrationController(
+            new Win32HotkeyRegistrar(_source.Handle));
     }
 
-    public bool Register(string shortcut)
-    {
-        UnregisterHotKey(_source.Handle, HotkeyId);
-        var gesture = ShortcutGesture.Parse(shortcut);
-        var modifiers = 0u;
-        if (gesture.Alt) modifiers |= 0x0001;
-        if (gesture.Control) modifiers |= 0x0002;
-        if (gesture.Shift) modifiers |= 0x0004;
-        if (gesture.Windows) modifiers |= 0x0008;
+    public string? ActiveShortcut => _registrations.ActiveShortcut;
 
-        var key = gesture.Key == "Space"
-            ? Key.Space
-            : Enum.Parse<Key>(gesture.Key, ignoreCase: true);
-        return RegisterHotKey(
-            _source.Handle,
-            HotkeyId,
-            modifiers | 0x4000,
-            (uint)KeyInterop.VirtualKeyFromKey(key));
-    }
+    public PlatformOperationResult TryReplace(string shortcut) =>
+        _registrations.TryReplace(shortcut);
 
     public void Dispose()
     {
-        UnregisterHotKey(_source.Handle, HotkeyId);
+        _registrations.Dispose();
         _source.RemoveHook(WindowProc);
     }
 
     private nint WindowProc(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
     {
-        if (message == 0x0312 && wParam == HotkeyId)
+        if (message == 0x0312 && _registrations.IsActiveRegistration((int)wParam))
         {
             handled = true;
             Pressed?.Invoke(this, EventArgs.Empty);
         }
 
         return 0;
+    }
+
+    private sealed class Win32HotkeyRegistrar(nint handle) : IHotkeyRegistrar
+    {
+        public bool TryRegister(int registrationId, string shortcut)
+        {
+            var gesture = ShortcutGesture.Parse(shortcut);
+            var modifiers = 0u;
+            if (gesture.Alt) modifiers |= 0x0001;
+            if (gesture.Control) modifiers |= 0x0002;
+            if (gesture.Shift) modifiers |= 0x0004;
+            if (gesture.Windows) modifiers |= 0x0008;
+
+            var key = Enum.Parse<Key>(
+                ShortcutKeyTranslator.ToWpfKeyName(gesture.Key),
+                ignoreCase: true);
+            return RegisterHotKey(
+                handle,
+                registrationId,
+                modifiers | 0x4000,
+                (uint)KeyInterop.VirtualKeyFromKey(key));
+        }
+
+        public void Unregister(int registrationId) =>
+            UnregisterHotKey(handle, registrationId);
     }
 
     [LibraryImport("user32.dll", SetLastError = true)]

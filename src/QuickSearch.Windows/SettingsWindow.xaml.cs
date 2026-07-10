@@ -7,15 +7,18 @@ public partial class SettingsWindow : Window
 {
     private readonly AppConfiguration _configuration;
     private readonly IMappingStore _store;
-    private readonly StartupRegistration _startup;
+    private readonly HotkeySettingsController _settings;
+    private readonly IStartupRegistration _startup;
 
     public SettingsWindow(
         AppConfiguration configuration,
         IMappingStore store,
-        StartupRegistration startup)
+        IHotkeyRegistration hotkey,
+        IStartupRegistration startup)
     {
         _configuration = configuration;
         _store = store;
+        _settings = new HotkeySettingsController(hotkey, store);
         _startup = startup;
         InitializeComponent();
         ShortcutBox.Text = configuration.Settings.GlobalShortcut;
@@ -50,13 +53,35 @@ public partial class SettingsWindow : Window
             var gesture = ShortcutGesture.Parse(ShortcutBox.Text);
             var shortcut = BuildShortcutText(gesture);
             var startWithWindows = StartupCheck.IsChecked == true;
-            _configuration.Settings = _configuration.Settings with
+            var candidate = _configuration.Settings with
             {
                 GlobalShortcut = shortcut,
                 StartWithWindows = startWithWindows
             };
-            await _store.SaveAsync(_configuration);
-            _startup.SetEnabled(startWithWindows);
+            var settingsResult = await _settings.ApplyAsync(_configuration, candidate);
+            if (!settingsResult.Success)
+            {
+                System.Windows.MessageBox.Show(
+                    this,
+                    settingsResult.Message,
+                    "无法保存设置",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            var startupResult = _startup.SetEnabled(startWithWindows);
+            if (!startupResult.Success)
+            {
+                System.Windows.MessageBox.Show(
+                    this,
+                    startupResult.Message,
+                    "无法更新开机启动",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
             DialogResult = true;
         }
         catch (FormatException exception)

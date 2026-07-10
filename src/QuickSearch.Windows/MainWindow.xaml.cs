@@ -12,8 +12,9 @@ public partial class MainWindow : Window, IDisposable
 {
     private readonly IMappingStore _store;
     private readonly EverythingFolderSearch _search;
-    private readonly ExplorerFolderOpener _opener;
-    private readonly StartupRegistration _startup;
+    private readonly IClipboardTextReader _clipboard;
+    private readonly IFolderOpener _opener;
+    private readonly IStartupRegistration _startup;
     private readonly Forms.NotifyIcon _trayIcon;
     private AppConfiguration _configuration = new();
     private GlobalHotkey? _hotkey;
@@ -24,11 +25,13 @@ public partial class MainWindow : Window, IDisposable
     public MainWindow(
         IMappingStore store,
         EverythingFolderSearch search,
-        ExplorerFolderOpener opener,
-        StartupRegistration startup)
+        IClipboardTextReader clipboard,
+        IFolderOpener opener,
+        IStartupRegistration startup)
     {
         _store = store;
         _search = search;
+        _clipboard = clipboard;
         _opener = opener;
         _startup = startup;
         InitializeComponent();
@@ -45,29 +48,38 @@ public partial class MainWindow : Window, IDisposable
             Visible = true
         };
         _trayIcon.DoubleClick += (_, _) => ShowLauncher();
-        Loaded += MainWindow_Loaded;
         SourceInitialized += MainWindow_SourceInitialized;
     }
 
-    public async void ActivateFromClipboard()
+    public void ActivateFromClipboard()
     {
-        try
+        var clipboard = _clipboard.ReadText();
+        if (!clipboard.Success)
         {
-            if (System.Windows.Clipboard.ContainsText())
-            {
-                _suppressAliasChange = true;
-                AliasBox.Text = System.Windows.Clipboard.GetText().Trim();
-                _suppressAliasChange = false;
-                UpdateMappingState();
-            }
+            StatusText.Text = clipboard.Message;
         }
-        catch (Exception exception)
+        else if (!string.IsNullOrWhiteSpace(clipboard.Value))
         {
-            StatusText.Text = $"无法读取剪贴板：{exception.Message}";
+            _suppressAliasChange = true;
+            AliasBox.Text = clipboard.Value;
+            _suppressAliasChange = false;
+            UpdateMappingState();
         }
 
         ShowLauncher();
-        await Task.CompletedTask;
+    }
+
+    public async Task InitializeAsync()
+    {
+        _configuration = await _store.LoadAsync();
+        UpdateMappingState();
+        var startupResult = _startup.SetEnabled(_configuration.Settings.StartWithWindows);
+        if (!startupResult.Success)
+        {
+            StatusText.Text = startupResult.Message;
+        }
+
+        RegisterConfiguredHotkey();
     }
 
     public void Dispose()
@@ -75,14 +87,6 @@ public partial class MainWindow : Window, IDisposable
         _hotkey?.Dispose();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
-    }
-
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
-    {
-        _configuration = await _store.LoadAsync();
-        _startup.SetEnabled(_configuration.Settings.StartWithWindows);
-        RegisterConfiguredHotkey();
-        UpdateMappingState();
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
@@ -100,9 +104,10 @@ public partial class MainWindow : Window, IDisposable
 
         try
         {
-            if (!_hotkey.Register(_configuration.Settings.GlobalShortcut))
+            var result = _hotkey.TryReplace(_configuration.Settings.GlobalShortcut);
+            if (!result.Success)
             {
-                StatusText.Text = $"快捷键 {_configuration.Settings.GlobalShortcut} 已被其他程序占用。";
+                StatusText.Text = result.Message;
             }
         }
         catch (FormatException exception)
@@ -180,8 +185,9 @@ public partial class MainWindow : Window, IDisposable
                 EverythingHealth.Ready when results.Count > 0 => $"找到 {results.Count} 个候选文件夹。",
                 EverythingHealth.Ready => "没有找到匹配的文件夹。",
                 EverythingHealth.DllMissing => "缺少 Everything64.dll，请重新安装 QuickSearch。",
-                EverythingHealth.NotRunning => "Everything 未运行或索引尚未就绪，请安装并启动普通版 Everything 1.4。",
-                _ => "Everything 查询失败，请确认普通版 Everything 正在运行。"
+                EverythingHealth.NotReady => "Everything 索引数据库正在加载，请稍后重试。",
+                EverythingHealth.Unavailable => "无法连接 Everything，请安装并启动普通版 Everything 1.4。",
+                _ => _search.FailureMessage ?? "Everything 查询失败，请重试。"
             };
         }
         catch (OperationCanceledException)
@@ -218,14 +224,14 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        try
+        var openResult = _opener.Open(path);
+        if (openResult.Success)
         {
-            _opener.Open(path);
             Hide();
         }
-        catch (DirectoryNotFoundException)
+        else
         {
-            StatusText.Text = "文件夹已经不存在，请重新搜索。";
+            StatusText.Text = openResult.Message;
             _confirmedPath = null;
         }
     }
@@ -260,7 +266,17 @@ public partial class MainWindow : Window, IDisposable
 
     private void OpenSettings()
     {
-        var window = new SettingsWindow(_configuration, _store, _startup)
+        if (_hotkey is null)
+        {
+            StatusText.Text = "快捷键服务尚未就绪。";
+            return;
+        }
+
+        var window = new SettingsWindow(
+            _configuration,
+            _store,
+            _hotkey,
+            _startup)
         {
             Owner = this
         };

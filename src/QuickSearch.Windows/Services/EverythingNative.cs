@@ -1,38 +1,56 @@
 using System.Runtime.InteropServices;
+using QuickSearch.Core;
 
 namespace QuickSearch.Windows;
 
-internal static partial class EverythingNative
+internal sealed partial class EverythingNativeAdapter : IEverythingNative
 {
-    internal const uint RequestFileName = 0x00000001;
-    internal const uint RequestPath = 0x00000002;
+    public bool IsDatabaseLoaded() => EverythingIsDatabaseLoaded();
+
+    public void SetSearch(string search) => EverythingSetSearch(search);
+
+    public void SetRequestFlags(uint flags) => EverythingSetRequestFlags(flags);
+
+    public void SetMax(uint maximumResults) => EverythingSetMax(maximumResults);
+
+    public bool Query(bool wait) => EverythingQuery(wait);
+
+    public uint GetNumResults() => EverythingGetNumResults();
+
+    public string? GetResultFileName(uint index) =>
+        Marshal.PtrToStringUni(EverythingGetResultFileName(index));
+
+    public string? GetResultPath(uint index) =>
+        Marshal.PtrToStringUni(EverythingGetResultPath(index));
+
+    public uint GetLastError() => EverythingGetLastError();
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_SetSearchW", StringMarshalling = StringMarshalling.Utf16)]
-    internal static partial void SetSearch(string search);
+    private static partial void EverythingSetSearch(string search);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_SetRequestFlags")]
-    internal static partial void SetRequestFlags(uint flags);
+    private static partial void EverythingSetRequestFlags(uint flags);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_SetMax")]
-    internal static partial void SetMax(uint maximumResults);
+    private static partial void EverythingSetMax(uint maximumResults);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_QueryW")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool Query([MarshalAs(UnmanagedType.Bool)] bool wait);
+    private static partial bool EverythingQuery([MarshalAs(UnmanagedType.Bool)] bool wait);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_GetNumResults")]
-    internal static partial uint GetNumResults();
+    private static partial uint EverythingGetNumResults();
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_GetResultFileNameW")]
-    internal static partial nint GetResultFileName(uint index);
+    private static partial nint EverythingGetResultFileName(uint index);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_GetResultPathW")]
-    internal static partial nint GetResultPath(uint index);
+    private static partial nint EverythingGetResultPath(uint index);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_IsDBLoaded")]
     [return: MarshalAs(UnmanagedType.Bool)]
-    internal static partial bool IsDatabaseLoaded();
+    private static partial bool EverythingIsDatabaseLoaded();
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_GetLastError")]
-    internal static partial uint GetLastError();
+    private static partial uint EverythingGetLastError();
 }

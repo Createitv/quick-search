@@ -28,4 +28,26 @@ public sealed class ShortcutGestureTests
     {
         Assert.Throws<FormatException>(() => ShortcutGesture.Parse(text));
     }
+
+    [Fact]
+    public void ToWpfKeyName_TranslatesDigitToWpfDKey()
+    {
+        var gesture = ShortcutGesture.Parse("Ctrl+Alt+1");
+
+        var keyName = ShortcutKeyTranslator.ToWpfKeyName(gesture.Key);
+
+        Assert.Equal("D1", keyName);
+    }
+
+    [Theory]
+    [InlineData("A", "A")]
+    [InlineData("Space", "Space")]
+    [InlineData("F1", "F1")]
+    [InlineData("F24", "F24")]
+    public void ToWpfKeyName_PreservesExistingSupportedKeyNames(
+        string shortcutKey,
+        string expected)
+    {
+        Assert.Equal(expected, ShortcutKeyTranslator.ToWpfKeyName(shortcutKey));
+    }
 }
