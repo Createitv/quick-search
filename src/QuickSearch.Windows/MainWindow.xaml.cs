@@ -7,6 +7,8 @@ using DragDropEffects = System.Windows.DragDropEffects;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
+using Border = System.Windows.Controls.Border;
+using Button = System.Windows.Controls.Button;
 
 namespace QuickSearch.Windows;
 

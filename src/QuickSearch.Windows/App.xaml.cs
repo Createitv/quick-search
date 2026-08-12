@@ -136,7 +136,7 @@ public partial class App : System.Windows.Application
     }
 
     private void Update_ShutdownRequested(object? sender, EventArgs e) =>
-        Dispatcher.BeginInvoke(Shutdown);
+        Dispatcher.BeginInvoke(() => Shutdown());
 
     private void InitializeTray()
     {
