@@ -9,6 +9,9 @@ using MouseEventArgs = System.Windows.Input.MouseEventArgs;
 using Point = System.Windows.Point;
 using Border = System.Windows.Controls.Border;
 using Button = System.Windows.Controls.Button;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
+using Wpf.Ui.Controls;
 
 namespace QuickSearch.Windows;
 
@@ -359,7 +362,7 @@ public partial class MainWindow : Window, IDisposable
     private void Rule_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         _ruleDragStart = e.GetPosition(this);
-        _draggedRule = (sender as FrameworkElement)?.DataContext as FolderRule;
+        _draggedRule = ResolveFolderRule((sender as FrameworkElement)?.DataContext);
     }
 
     private void Rule_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -385,6 +388,113 @@ public partial class MainWindow : Window, IDisposable
             _draggedRule = null;
         }
     }
+
+    private void RuleContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu contextMenu
+            || contextMenu.PlacementTarget is not FrameworkElement placementTarget
+            || ResolveFolderRule(placementTarget.DataContext) is not { } rule)
+        {
+            return;
+        }
+
+        contextMenu.DataContext = rule;
+        var moveRoot = contextMenu.Items
+            .OfType<MenuItem>()
+            .FirstOrDefault(item => string.Equals(
+                item.Tag as string,
+                "MoveRuleRoot",
+                StringComparison.Ordinal));
+        if (moveRoot is null)
+        {
+            return;
+        }
+
+        moveRoot.Items.Clear();
+        foreach (var rootFolder in _viewModel.Explorer.RootFolders)
+        {
+            moveRoot.Items.Add(CreateMoveRuleMenuItem(rootFolder, rule));
+        }
+
+        moveRoot.IsEnabled = moveRoot.Items.Count > 0;
+    }
+
+    private MenuItem CreateMoveRuleMenuItem(
+        NavigationFolderNodeViewModel node,
+        FolderRule rule)
+    {
+        var isCurrentFolder = node.Id == rule.NavigationFolderId;
+        var item = new MenuItem
+        {
+            Header = node.Name,
+            Icon = new SymbolIcon
+            {
+                Symbol = isCurrentFolder
+                    ? SymbolRegular.Checkmark20
+                    : SymbolRegular.Folder20
+            }
+        };
+
+        if (node.Children.Count == 0)
+        {
+            ConfigureMoveRuleAction(item, node.Id, rule.Id, isCurrentFolder);
+            return item;
+        }
+
+        var chooseFolder = new MenuItem
+        {
+            Header = isCurrentFolder ? "当前位置" : $"移动到“{node.Name}”",
+            Icon = new SymbolIcon
+            {
+                Symbol = isCurrentFolder
+                    ? SymbolRegular.Checkmark20
+                    : SymbolRegular.FolderArrowRight20
+            }
+        };
+        ConfigureMoveRuleAction(chooseFolder, node.Id, rule.Id, isCurrentFolder);
+        item.Items.Add(chooseFolder);
+        item.Items.Add(new System.Windows.Controls.Separator());
+        foreach (var child in node.Children)
+        {
+            item.Items.Add(CreateMoveRuleMenuItem(child, rule));
+        }
+
+        return item;
+    }
+
+    private void ConfigureMoveRuleAction(
+        MenuItem item,
+        Guid folderId,
+        Guid ruleId,
+        bool isCurrentFolder)
+    {
+        item.IsEnabled = !isCurrentFolder;
+        item.Tag = new RuleMoveRequest(ruleId, folderId);
+        item.Click += MoveRuleMenuItem_Click;
+    }
+
+    private void MoveRuleMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is RuleMoveRequest request)
+        {
+            _viewModel.Explorer.MoveRuleCommand.Execute(request);
+        }
+    }
+
+    private void RuleContextOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (ResolveFolderRule((sender as FrameworkElement)?.DataContext) is { } rule)
+        {
+            _viewModel.Explorer.OpenRuleCommand.Execute(rule);
+        }
+    }
+
+    private static FolderRule? ResolveFolderRule(object? dataContext) => dataContext switch
+    {
+        FolderRule rule => rule,
+        ExplorerSearchResult { Rule: { } rule } => rule,
+        _ => null
+    };
 
     private void Folder_DragOver(object sender, DragEventArgs e)
     {
@@ -451,11 +561,24 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private void CurrentFolder_NewRule_Click(object sender, RoutedEventArgs e)
+    private async void CurrentFolder_NewRule_Click(object sender, RoutedEventArgs e)
     {
-        var targetFolderId = _viewModel.Explorer.CurrentFolder.Id;
-        ShowSettings();
-        _settingsViewModel?.Organizer.SelectFolder(targetFolderId);
+        var targetFolder = _viewModel.Explorer.CurrentFolder;
+        var targetPath = string.Join(
+            " › ",
+            _viewModel.Explorer.Breadcrumbs.Select(folder => folder.Name));
+        var dialog = new ShortcutEditorDialog(targetPath)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            await _viewModel.Explorer.CreateRuleAsync(
+                targetFolder.Id,
+                dialog.ShortcutTitle,
+                dialog.Keywords,
+                dialog.FolderPath);
+        }
     }
 
     private async void Folder_NewChild_Click(object sender, RoutedEventArgs e)

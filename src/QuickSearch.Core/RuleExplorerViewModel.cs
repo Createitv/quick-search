@@ -224,6 +224,34 @@ public sealed class RuleExplorerViewModel : ObservableObject
             "无法移动快捷方式");
     }
 
+    public async Task<FolderRule?> CreateRuleAsync(
+        Guid folderId,
+        string title,
+        IEnumerable<string> aliases,
+        string folderPath)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        var aliasValues = aliases.ToArray();
+        Guid createdRuleId = Guid.Empty;
+        var success = await ApplyImmediateAsync(
+            candidate =>
+            {
+                var created = candidate.AddRule(title, aliasValues, folderPath, folderId);
+                if (created.NavigationFolderId != folderId)
+                {
+                    created = candidate.MoveRule(created.Id, folderId);
+                }
+
+                createdRuleId = created.Id;
+            },
+            "快捷方式已保存。",
+            "无法创建快捷方式");
+
+        return success
+            ? _configuration.Rules.Single(rule => rule.Id == createdRuleId)
+            : null;
+    }
+
     public async Task<NavigationFolder> CreateFolderAsync(Guid? parentId, string name)
     {
         NavigationFolder created = EmptyFolder();

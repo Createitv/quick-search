@@ -250,6 +250,56 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task CreateRuleAsync_PersistsAndShowsRuleInCurrentFolder()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var personal = configuration.NavigationFolders.Single(folder => folder.Name == "个人");
+        viewModel.NavigateToFolder(personal.Id);
+
+        var created = await viewModel.CreateRuleAsync(
+            personal.Id,
+            "设计资料",
+            ["design", "ui"],
+            @"D:\Design");
+
+        Assert.NotNull(created);
+        Assert.Equal(personal.Id, created.NavigationFolderId);
+        Assert.Equal(["design", "ui"], created.Aliases);
+        Assert.Equal(created.Id, Assert.Single(viewModel.CurrentRules).Id);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
+    public async Task CreateRuleAsync_WhenSaveFails_DoesNotChangeLiveRules()
+    {
+        var configuration = CreateConfiguration();
+        var originalRuleCount = configuration.Rules.Count;
+        var store = new RecordingMappingStore(configuration)
+        {
+            SaveException = new IOException("disk full")
+        };
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+
+        var created = await viewModel.CreateRuleAsync(
+            viewModel.CurrentFolder.Id,
+            "设计资料",
+            ["design"],
+            @"D:\Design");
+
+        Assert.Null(created);
+        Assert.Equal(originalRuleCount, configuration.Rules.Count);
+        Assert.Empty(store.SavedConfigurations);
+    }
+
+    [Fact]
     public void NavigateFolderCommand_UsesFolderParameterAndRefreshesVisibleContent()
     {
         var configuration = CreateConfiguration();

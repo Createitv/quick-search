@@ -234,7 +234,7 @@
           </DockPanel>
           <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <Grid>
-              <TextBlock Padding="16,20" Text="当前文件夹还没有快捷方式。可从其他文件夹拖入，或在设置中创建。"
+              <TextBlock Padding="16,20" Text="当前文件夹还没有快捷方式。点击右上角“新建快捷方式”，或从其他文件夹拖入。"
                          TextWrapping="Wrap">
                 <TextBlock.Style>
                   <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
@@ -255,7 +255,22 @@
                           CommandParameter="{Binding}"
                           PreviewMouseLeftButtonDown="Rule_PreviewMouseLeftButtonDown"
                           PreviewMouseMove="Rule_PreviewMouseMove"
-                          ToolTip="单击打开；拖到左侧文件夹可移动">
+                          ToolTip="单击打开；拖到左侧文件夹或右键可移动">
+                    <Button.ContextMenu>
+                      <ContextMenu Opened="RuleContextMenu_Opened">
+                        <MenuItem Header="打开文件夹" Click="RuleContextOpen_Click">
+                          <MenuItem.Icon>
+                            <ui:SymbolIcon Symbol="OpenFolder20" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="移动到文件夹" Tag="MoveRuleRoot">
+                          <MenuItem.Icon>
+                            <ui:SymbolIcon Symbol="FolderArrowRight20" />
+                          </MenuItem.Icon>
+                        </MenuItem>
+                      </ContextMenu>
+                    </Button.ContextMenu>
                     <Grid>
                       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                       <ui:SymbolIcon Margin="0,0,11,0" Symbol="ReOrderDotsVertical20" FontSize="18"
@@ -331,13 +346,31 @@
                         </Grid>
                       </Button>
                       <Button Command="{Binding DataContext.Explorer.OpenRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                              CommandParameter="{Binding Rule}">
+                              CommandParameter="{Binding Rule}"
+                              PreviewMouseLeftButtonDown="Rule_PreviewMouseLeftButtonDown"
+                              PreviewMouseMove="Rule_PreviewMouseMove"
+                              ToolTip="单击打开；拖到左侧文件夹或右键可移动">
                         <Button.Style>
                           <Style TargetType="Button" BasedOn="{StaticResource RuleRowButtonStyle}">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static core:ExplorerSearchResultKind.Rule}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                           </Style>
                         </Button.Style>
+                        <Button.ContextMenu>
+                          <ContextMenu Opened="RuleContextMenu_Opened">
+                            <MenuItem Header="打开文件夹" Click="RuleContextOpen_Click">
+                              <MenuItem.Icon>
+                                <ui:SymbolIcon Symbol="OpenFolder20" />
+                              </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem Header="移动到文件夹" Tag="MoveRuleRoot">
+                              <MenuItem.Icon>
+                                <ui:SymbolIcon Symbol="FolderArrowRight20" />
+                              </MenuItem.Icon>
+                            </MenuItem>
+                          </ContextMenu>
+                        </Button.ContextMenu>
                         <Grid>
                           <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
