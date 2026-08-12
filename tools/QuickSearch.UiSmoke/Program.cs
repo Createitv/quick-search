@@ -51,6 +51,7 @@ internal static class Program
 
             launcherWindow.UpdateLayout();
             launcherWindow.Hide();
+            var windowCountBeforeSettings = application.Windows.Count;
             launcher.ShowSettingsCommand.Execute(null);
             application.Dispatcher.Invoke(
                 () => { },
@@ -63,12 +64,9 @@ internal static class Program
                 return 2;
             }
 
-            if (application.Windows.OfType<System.Windows.Window>()
-                .Any(window => window != mainWindow
-                               && window is not QuickLauncherWindow
-                               && window.IsVisible))
+            if (application.Windows.Count != windowCountBeforeSettings)
             {
-                Console.Error.WriteLine("Settings unexpectedly opened a separate window.");
+                Console.Error.WriteLine("Settings created an unexpected additional window.");
                 return 2;
             }
 
