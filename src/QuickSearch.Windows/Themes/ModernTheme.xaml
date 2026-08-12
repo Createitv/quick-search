@@ -293,13 +293,35 @@
 
   <Style x:Key="ExplorerTreeItemStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
     <Setter Property="MinHeight" Value="34" />
-    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="NavigationSurface"
+                  Background="{TemplateBinding Background}"
+                  Padding="{TemplateBinding Padding}"
+                  CornerRadius="4">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="NavigationSurface" Property="Background" Value="#E9EDF3" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
     <Style.Triggers>
       <DataTrigger Binding="{Binding IsSelected}" Value="True">
-        <Setter Property="Background" Value="{DynamicResource SoftBlueBrush}" />
-        <Setter Property="Foreground" Value="{DynamicResource RouteBlueBrush}" />
+        <Setter Property="Background" Value="#E2E7EE" />
+        <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
         <Setter Property="FontWeight" Value="SemiBold" />
       </DataTrigger>
     </Style.Triggers>
@@ -310,6 +332,7 @@
     <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
     <Setter Property="Margin" Value="0,1" />
     <Setter Property="Padding" Value="0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusStyle}" />
   </Style>
 

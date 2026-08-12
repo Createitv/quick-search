@@ -42,10 +42,11 @@ public sealed class JsonMappingStore : IMappingStore
             using var document = JsonDocument.Parse(json);
             if (HasProperty(document.RootElement, "rules"))
             {
-                return JsonSerializer.Deserialize<AppConfiguration>(
-                           json,
-                           SerializerOptions)
-                       ?? throw new JsonException("Configuration JSON was null.");
+                var configuration = JsonSerializer.Deserialize<AppConfiguration>(
+                                        json,
+                                        SerializerOptions)
+                                    ?? throw new JsonException("Configuration JSON was null.");
+                return ConfigurationMigrator.Upgrade(configuration);
             }
 
             var legacy = JsonSerializer.Deserialize<LegacyConfiguration>(
@@ -73,9 +74,9 @@ public sealed class JsonMappingStore : IMappingStore
 
         var directoryPath = Path.GetDirectoryName(_configPath)!;
         Directory.CreateDirectory(directoryPath);
-        if (configuration.Settings.SchemaVersion < 2)
+        if (configuration.Settings.SchemaVersion < 3)
         {
-            configuration.Settings = configuration.Settings with { SchemaVersion = 2 };
+            ConfigurationMigrator.Upgrade(configuration);
         }
 
         var json = JsonSerializer.Serialize(configuration, SerializerOptions);

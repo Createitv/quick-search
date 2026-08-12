@@ -3,9 +3,12 @@ namespace QuickSearch.Core.Tests;
 public sealed class AppConfigurationTests
 {
     [Fact]
-    public void AppSettings_DefaultsSchemaVersionToTwo()
+    public void AppSettings_DefaultsToSchemaThreeAndAltKLauncher()
     {
-        Assert.Equal(2, new AppSettings().SchemaVersion);
+        var settings = new AppSettings();
+
+        Assert.Equal(3, settings.SchemaVersion);
+        Assert.Equal("Alt+K", settings.QuickLauncherShortcut);
     }
 
     [Fact]

@@ -224,6 +224,32 @@ public sealed class RuleExplorerViewModel : ObservableObject
             "无法移动快捷方式");
     }
 
+    public async Task<bool> MoveFolderAsync(Guid folderId, Guid targetParentId)
+    {
+        if (_configuration.NavigationFolders.FirstOrDefault(folder =>
+                folder.Id == folderId) is not { } folder
+            || _configuration.NavigationFolders.FirstOrDefault(candidate =>
+                candidate.Id == targetParentId) is not { } target)
+        {
+            Report("文件夹或目标位置不存在。", StatusKind.Error);
+            return false;
+        }
+
+        if (folder.ParentId == targetParentId)
+        {
+            Report($"“{folder.Name}”已经在“{target.Name}”中。", StatusKind.Neutral);
+            return false;
+        }
+
+        return await ApplyImmediateAsync(
+            candidate => candidate.MoveNavigationFolder(
+                folderId,
+                targetParentId,
+                int.MaxValue),
+            $"已将“{folder.Name}”移动到“{target.Name}”中。",
+            "无法移动文件夹");
+    }
+
     public async Task<FolderRule?> CreateRuleAsync(
         Guid folderId,
         string title,
@@ -252,6 +278,47 @@ public sealed class RuleExplorerViewModel : ObservableObject
             : null;
     }
 
+    public async Task<bool> UpdateRuleAsync(
+        Guid ruleId,
+        string title,
+        IEnumerable<string> aliases,
+        string folderPath)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+        var existing = _configuration.Rules.FirstOrDefault(rule => rule.Id == ruleId);
+        if (existing is null)
+        {
+            Report("快捷方式不存在。", StatusKind.Error);
+            return false;
+        }
+
+        var aliasValues = aliases.ToArray();
+        return await ApplyImmediateAsync(
+            candidate => candidate.UpdateRule(
+                ruleId,
+                title,
+                aliasValues,
+                folderPath,
+                existing.NavigationFolderId),
+            "快捷方式已更新。",
+            "无法更新快捷方式");
+    }
+
+    public async Task<bool> DeleteRuleAsync(Guid ruleId)
+    {
+        var existing = _configuration.Rules.FirstOrDefault(rule => rule.Id == ruleId);
+        if (existing is null)
+        {
+            Report("快捷方式不存在。", StatusKind.Error);
+            return false;
+        }
+
+        return await ApplyImmediateAsync(
+            candidate => candidate.RemoveRule(ruleId),
+            $"已删除快捷方式“{existing.DisplayTitle}”。",
+            "无法删除快捷方式");
+    }
+
     public async Task<NavigationFolder> CreateFolderAsync(Guid? parentId, string name)
     {
         NavigationFolder created = EmptyFolder();
@@ -269,6 +336,36 @@ public sealed class RuleExplorerViewModel : ObservableObject
             candidate => candidate.RenameNavigationFolder(folderId, name),
             "文件夹已重命名。",
             "无法重命名文件夹");
+
+    public async Task<bool> DeleteFolderAsync(Guid folderId, FolderDeletionMode mode)
+    {
+        if (folderId == _configuration.UncategorizedFolderId)
+        {
+            Report("“未分类”不能删除。", StatusKind.Error);
+            return false;
+        }
+
+        var existing = _configuration.NavigationFolders.FirstOrDefault(folder =>
+            folder.Id == folderId);
+        if (existing is null)
+        {
+            Report("文件夹不存在。", StatusKind.Error);
+            return false;
+        }
+
+        var parentId = existing.ParentId ?? _configuration.UncategorizedFolderId;
+        var success = await ApplyImmediateAsync(
+            candidate => DeleteFolder(candidate, folderId, mode),
+            $"已删除文件夹“{existing.Name}”。",
+            "无法删除文件夹");
+        if (success)
+        {
+            _currentFolderId = parentId;
+            RefreshFromConfiguration();
+        }
+
+        return success;
+    }
 
     public async Task OpenRuleAsync(FolderRule rule)
     {
@@ -477,6 +574,63 @@ public sealed class RuleExplorerViewModel : ObservableObject
             RefreshFromConfiguration();
             Report($"{failurePrefix}：{exception.Message}", StatusKind.Error);
             return false;
+        }
+    }
+
+    private static void DeleteFolder(
+        AppConfiguration candidate,
+        Guid folderId,
+        FolderDeletionMode mode)
+    {
+        var folder = candidate.NavigationFolders.Single(item => item.Id == folderId);
+        if (mode == FolderDeletionMode.MoveContentsToParent)
+        {
+            var targetId = folder.ParentId ?? candidate.UncategorizedFolderId;
+            foreach (var rule in candidate.Rules
+                         .Where(rule => rule.NavigationFolderId == folderId)
+                         .ToArray())
+            {
+                candidate.MoveRule(rule.Id, targetId);
+            }
+
+            foreach (var child in candidate.NavigationFolders
+                         .Where(item => item.ParentId == folderId)
+                         .ToArray())
+            {
+                candidate.MoveNavigationFolder(child.Id, targetId, child.SortOrder);
+            }
+
+            candidate.RemoveNavigationFolder(folderId);
+            return;
+        }
+
+        var subtree = GetSubtree(candidate, folderId).ToArray();
+        foreach (var rule in candidate.Rules
+                     .Where(rule => subtree.Contains(rule.NavigationFolderId))
+                     .ToArray())
+        {
+            candidate.RemoveRule(rule.Id);
+        }
+
+        foreach (var id in subtree.Reverse())
+        {
+            candidate.RemoveNavigationFolder(id);
+        }
+    }
+
+    private static IEnumerable<Guid> GetSubtree(
+        AppConfiguration configuration,
+        Guid rootId)
+    {
+        yield return rootId;
+        foreach (var child in configuration.NavigationFolders
+                     .Where(folder => folder.ParentId == rootId)
+                     .ToArray())
+        {
+            foreach (var descendant in GetSubtree(configuration, child.Id))
+            {
+                yield return descendant;
+            }
         }
     }
 

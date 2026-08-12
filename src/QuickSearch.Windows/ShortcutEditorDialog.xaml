@@ -23,8 +23,8 @@
                        Foreground="{DynamicResource RouteBlueBrush}" />
       </Border>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock Text="新建快捷方式" Style="{StaticResource WindowTitleStyle}" FontSize="22" />
-        <TextBlock Margin="0,3,0,0" Text="保存后可搜索、拖拽整理或通过右键移动"
+        <TextBlock x:Name="HeadingText" Text="新建快捷方式" Style="{StaticResource WindowTitleStyle}" FontSize="22" />
+        <TextBlock x:Name="DescriptionText" Margin="0,3,0,0" Text="保存后可搜索、拖拽整理或通过右键移动"
                    Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
     </StackPanel>
@@ -87,8 +87,8 @@
         <Button x:Name="ConfirmButton" Margin="8,0,0,0" IsDefault="True"
                 Style="{StaticResource PrimaryButtonStyle}" Click="ConfirmButton_Click">
           <StackPanel Orientation="Horizontal">
-            <ui:SymbolIcon Margin="0,0,6,0" Symbol="AddCircle20" FontSize="16" />
-            <TextBlock Text="创建快捷方式" Foreground="White" />
+            <ui:SymbolIcon x:Name="ConfirmIcon" Margin="0,0,6,0" Symbol="AddCircle20" FontSize="16" />
+            <TextBlock x:Name="ConfirmText" Text="创建快捷方式" Foreground="White" />
           </StackPanel>
         </Button>
       </StackPanel>

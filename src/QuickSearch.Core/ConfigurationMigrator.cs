@@ -29,10 +29,37 @@ public static class ConfigurationMigrator
 
         return new AppConfiguration(clock)
         {
-            Settings = settings with { SchemaVersion = 2 },
+            Settings = UpgradeSettings(settings),
             NavigationFolders = [uncategorized],
             Rules = rules,
             PinnedFolderIds = []
+        };
+    }
+
+    public static AppConfiguration Upgrade(AppConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        configuration.Settings = UpgradeSettings(configuration.Settings);
+        return configuration;
+    }
+
+    private static AppSettings UpgradeSettings(AppSettings settings)
+    {
+        if (settings.SchemaVersion >= 3)
+        {
+            return settings;
+        }
+
+        var launcherShortcut = string.Equals(
+            settings.QuickLauncherShortcut,
+            "Ctrl+Alt+Space",
+            StringComparison.OrdinalIgnoreCase)
+            ? "Alt+K"
+            : settings.QuickLauncherShortcut;
+        return settings with
+        {
+            SchemaVersion = 3,
+            QuickLauncherShortcut = launcherShortcut
         };
     }
 

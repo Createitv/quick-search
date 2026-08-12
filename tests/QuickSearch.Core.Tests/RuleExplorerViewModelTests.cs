@@ -250,6 +250,35 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task MoveFolderAsync_CreatesNestedTreeAndRejectsCycles()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var customer = configuration.NavigationFolders.Single(folder => folder.Name == "客户");
+        var personal = configuration.NavigationFolders.Single(folder => folder.Name == "个人");
+        var development = configuration.NavigationFolders.Single(folder => folder.Name == "开发");
+
+        var moved = await viewModel.MoveFolderAsync(personal.Id, development.Id);
+        var rejected = await viewModel.MoveFolderAsync(customer.Id, personal.Id);
+
+        Assert.True(moved);
+        Assert.False(rejected);
+        Assert.Equal(
+            development.Id,
+            configuration.NavigationFolders.Single(folder => folder.Id == personal.Id).ParentId);
+        Assert.Null(configuration.NavigationFolders.Single(folder => folder.Id == customer.Id).ParentId);
+        var customerNode = viewModel.RootFolders.Single(node => node.Id == customer.Id);
+        Assert.Equal(
+            personal.Id,
+            customerNode.Children.Single().Children.Single().Children.Single().Id);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
     public async Task CreateRuleAsync_PersistsAndShowsRuleInCurrentFolder()
     {
         var configuration = CreateConfiguration();
@@ -297,6 +326,86 @@ public sealed class RuleExplorerViewModelTests
         Assert.Null(created);
         Assert.Equal(originalRuleCount, configuration.Rules.Count);
         Assert.Empty(store.SavedConfigurations);
+    }
+
+    [Fact]
+    public async Task UpdateAndDeleteRuleAsync_PersistAndRefreshCurrentRules()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var rule = configuration.Rules.Single();
+        viewModel.NavigateToFolder(rule.NavigationFolderId);
+
+        var updated = await viewModel.UpdateRuleAsync(
+            rule.Id,
+            "QuickSearch 新名称",
+            ["launcher", "folder"],
+            @"D:\QuickSearch");
+
+        Assert.True(updated);
+        var savedRule = Assert.Single(viewModel.CurrentRules);
+        Assert.Equal("QuickSearch 新名称", savedRule.Title);
+        Assert.Equal(["launcher", "folder"], savedRule.Aliases);
+        Assert.Equal(@"D:\QuickSearch", savedRule.FolderPath);
+
+        var deleted = await viewModel.DeleteRuleAsync(rule.Id);
+
+        Assert.True(deleted);
+        Assert.Empty(viewModel.CurrentRules);
+        Assert.Empty(configuration.Rules);
+        Assert.Equal(2, store.SavedConfigurations.Count);
+    }
+
+    [Fact]
+    public async Task DeleteFolderAsync_CanMoveContentsToParent()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var creek = configuration.NavigationFolders.Single(folder => folder.Name == "小溪");
+        var development = configuration.NavigationFolders.Single(folder => folder.Name == "开发");
+        var customer = configuration.NavigationFolders.Single(folder => folder.Name == "客户");
+
+        var deleted = await viewModel.DeleteFolderAsync(
+            creek.Id,
+            FolderDeletionMode.MoveContentsToParent);
+
+        Assert.True(deleted);
+        Assert.DoesNotContain(configuration.NavigationFolders, folder => folder.Id == creek.Id);
+        Assert.Equal(
+            customer.Id,
+            configuration.NavigationFolders.Single(folder => folder.Id == development.Id).ParentId);
+        Assert.Equal(customer.Id, viewModel.CurrentFolder.Id);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
+    public async Task DeleteFolderAsync_CanDeleteSubtreeAndRules()
+    {
+        var configuration = CreateConfiguration();
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            new RecordingMappingStore(configuration),
+            new RecordingFolderOpener());
+        var customer = configuration.NavigationFolders.Single(folder => folder.Name == "客户");
+
+        var deleted = await viewModel.DeleteFolderAsync(
+            customer.Id,
+            FolderDeletionMode.DeleteSubtree);
+
+        Assert.True(deleted);
+        Assert.DoesNotContain(configuration.NavigationFolders, folder => folder.Name == "客户");
+        Assert.DoesNotContain(configuration.NavigationFolders, folder => folder.Name == "小溪");
+        Assert.DoesNotContain(configuration.NavigationFolders, folder => folder.Name == "开发");
+        Assert.Empty(configuration.Rules);
+        Assert.Equal(configuration.UncategorizedFolderId, viewModel.CurrentFolder.Id);
     }
 
     [Fact]

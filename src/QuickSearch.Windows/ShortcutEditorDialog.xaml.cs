@@ -1,6 +1,8 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using QuickSearch.Core;
+using Wpf.Ui.Controls;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 using FormsDialogResult = System.Windows.Forms.DialogResult;
 
@@ -8,13 +10,26 @@ namespace QuickSearch.Windows;
 
 public partial class ShortcutEditorDialog : Window
 {
-    public ShortcutEditorDialog(string targetFolderPath)
+    public ShortcutEditorDialog(string targetFolderPath, FolderRule? shortcut = null)
     {
         TargetFolderPath = targetFolderPath;
         InitializeComponent();
+        if (shortcut is not null)
+        {
+            Title = "编辑快捷方式";
+            HeadingText.Text = "编辑快捷方式";
+            DescriptionText.Text = "修改名称、搜索关键词或真实文件夹路径";
+            ConfirmIcon.Symbol = SymbolRegular.Edit20;
+            ConfirmText.Text = "保存修改";
+            TitleBox.Text = shortcut.Title;
+            KeywordsBox.Text = string.Join(", ", shortcut.Aliases);
+            PathBox.Text = shortcut.FolderPath;
+        }
+
         Loaded += (_, _) =>
         {
             TitleBox.Focus();
+            TitleBox.SelectAll();
             Validate();
         };
     }

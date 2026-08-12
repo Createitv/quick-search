@@ -20,7 +20,7 @@ public sealed class ConfigurationMigratorTests
             ],
             new FixedTimeProvider(created.AddDays(1)));
 
-        Assert.Equal(2, configuration.Settings.SchemaVersion);
+        Assert.Equal(3, configuration.Settings.SchemaVersion);
         Assert.Equal(2, configuration.Rules.Count);
         Assert.Equal(2, configuration.FindMappings("docs").Count);
         Assert.Equal(
@@ -32,6 +32,35 @@ public sealed class ConfigurationMigratorTests
             rule => Assert.Equal(
                 configuration.UncategorizedFolderId,
                 rule.NavigationFolderId));
+    }
+
+    [Fact]
+    public void Upgrade_ReplacesOnlyThePreviousDefaultLauncherShortcut()
+    {
+        var previousDefault = new AppConfiguration
+        {
+            Settings = new AppSettings
+            {
+                SchemaVersion = 2,
+                QuickLauncherShortcut = "Ctrl+Alt+Space"
+            }
+        };
+        var customized = new AppConfiguration
+        {
+            Settings = new AppSettings
+            {
+                SchemaVersion = 2,
+                QuickLauncherShortcut = "Ctrl+Shift+L"
+            }
+        };
+
+        ConfigurationMigrator.Upgrade(previousDefault);
+        ConfigurationMigrator.Upgrade(customized);
+
+        Assert.Equal(3, previousDefault.Settings.SchemaVersion);
+        Assert.Equal("Alt+K", previousDefault.Settings.QuickLauncherShortcut);
+        Assert.Equal(3, customized.Settings.SchemaVersion);
+        Assert.Equal("Ctrl+Shift+L", customized.Settings.QuickLauncherShortcut);
     }
 
     [Fact]

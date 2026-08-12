@@ -5,6 +5,7 @@ public sealed class ShortcutGestureTests
     [Theory]
     [InlineData("Ctrl+Alt+F", true, true, false, "F")]
     [InlineData("Ctrl+Shift+Space", true, false, true, "Space")]
+    [InlineData("Alt+K", false, true, false, "K")]
     public void Parse_ReturnsModifiersAndKey(
         string text,
         bool control,

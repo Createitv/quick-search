@@ -36,6 +36,8 @@ public partial class MainWindow : Window, IDisposable
     private NavigationFolder? _draggedPin;
     private Point _ruleDragStart;
     private FolderRule? _draggedRule;
+    private Point _folderDragStart;
+    private NavigationFolder? _draggedFolder;
     private bool _allowClose;
 
     public MainWindow(
@@ -345,6 +347,20 @@ public partial class MainWindow : Window, IDisposable
 
     private void QuickLauncher_Click(object sender, RoutedEventArgs e) => ShowQuickLauncher();
 
+    private void CollapseSidebar_Click(object sender, RoutedEventArgs e)
+    {
+        Sidebar.Visibility = Visibility.Collapsed;
+        CollapsedSidebar.Visibility = Visibility.Visible;
+        SidebarColumn.Width = new GridLength(48);
+    }
+
+    private void ExpandSidebar_Click(object sender, RoutedEventArgs e)
+    {
+        SidebarColumn.Width = new GridLength(210);
+        CollapsedSidebar.Visibility = Visibility.Collapsed;
+        Sidebar.Visibility = Visibility.Visible;
+    }
+
     private void ToggleMaximize() => WindowState = WindowState == WindowState.Maximized
         ? WindowState.Normal
         : WindowState.Maximized;
@@ -609,6 +625,48 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private async void RuleContextEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (ResolveFolderRule((sender as FrameworkElement)?.DataContext) is not { } rule)
+        {
+            return;
+        }
+
+        var targetPath = string.Join(
+            " › ",
+            BuildFolderPath(rule.NavigationFolderId));
+        var dialog = new ShortcutEditorDialog(targetPath, rule)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            await _viewModel.Explorer.UpdateRuleAsync(
+                rule.Id,
+                dialog.ShortcutTitle,
+                dialog.Keywords,
+                dialog.FolderPath);
+        }
+    }
+
+    private async void RuleContextDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (ResolveFolderRule((sender as FrameworkElement)?.DataContext) is not { } rule)
+        {
+            return;
+        }
+
+        var choice = System.Windows.MessageBox.Show(
+            $"确定删除快捷方式“{rule.DisplayTitle}”吗？\n\n只会删除快捷方式，不会删除真实文件夹。",
+            "删除快捷方式",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (choice == MessageBoxResult.Yes)
+        {
+            await _viewModel.Explorer.DeleteRuleAsync(rule.Id);
+        }
+    }
+
     private static FolderRule? ResolveFolderRule(object? dataContext) => dataContext switch
     {
         FolderRule rule => rule,
@@ -619,9 +677,17 @@ public partial class MainWindow : Window, IDisposable
     private void Folder_DragOver(object sender, DragEventArgs e)
     {
         if (sender is not Button targetButton
-            || targetButton.DataContext is not NavigationFolderNodeViewModel target
-            || e.Data.GetData(typeof(FolderRule)) is not FolderRule rule
-            || rule.NavigationFolderId == target.Id)
+            || targetButton.DataContext is not NavigationFolderNodeViewModel target)
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        var canDropRule = e.Data.GetData(typeof(FolderRule)) is FolderRule rule
+                          && rule.NavigationFolderId != target.Id;
+        var canDropFolder = e.Data.GetData(typeof(NavigationFolder)) is NavigationFolder folder
+                            && CanNestFolder(folder.Id, target.Id);
+        if (!canDropRule && !canDropFolder)
         {
             e.Effects = DragDropEffects.None;
             return;
@@ -639,16 +705,90 @@ public partial class MainWindow : Window, IDisposable
 
     private void Folder_Drop(object sender, DragEventArgs e)
     {
-        if (e.Data.GetData(typeof(FolderRule)) is not FolderRule rule
-            || (sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel target)
+        if ((sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel target)
         {
             return;
         }
 
         ResetFolderDropIndicator(sender as Button);
-        _viewModel.Explorer.MoveRuleCommand.Execute(new RuleMoveRequest(rule.Id, target.Id));
-        _draggedRule = null;
+        if (e.Data.GetData(typeof(FolderRule)) is FolderRule rule)
+        {
+            _viewModel.Explorer.MoveRuleCommand.Execute(new RuleMoveRequest(rule.Id, target.Id));
+            _draggedRule = null;
+        }
+        else if (e.Data.GetData(typeof(NavigationFolder)) is NavigationFolder folder
+                 && CanNestFolder(folder.Id, target.Id))
+        {
+            _ = _viewModel.Explorer.MoveFolderAsync(folder.Id, target.Id);
+            _draggedFolder = null;
+        }
+        else
+        {
+            return;
+        }
+
         e.Handled = true;
+    }
+
+    private void Folder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _folderDragStart = e.GetPosition(this);
+        _draggedFolder = (sender as FrameworkElement)?.DataContext
+            is NavigationFolderNodeViewModel node
+            ? node.Folder
+            : null;
+    }
+
+    private void Folder_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _draggedFolder is null)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        if (Math.Abs(current.X - _folderDragStart.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(current.Y - _folderDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        try
+        {
+            DragDrop.DoDragDrop(
+                (DependencyObject)sender,
+                _draggedFolder,
+                DragDropEffects.Move);
+        }
+        finally
+        {
+            _draggedFolder = null;
+        }
+    }
+
+    private bool CanNestFolder(Guid folderId, Guid targetParentId)
+    {
+        if (folderId == _viewModel.Configuration.UncategorizedFolderId
+            || folderId == targetParentId)
+        {
+            return false;
+        }
+
+        var currentId = (Guid?)targetParentId;
+        var visited = new HashSet<Guid>();
+        while (currentId is Guid id && visited.Add(id))
+        {
+            if (id == folderId)
+            {
+                return false;
+            }
+
+            currentId = _viewModel.Configuration.NavigationFolders
+                .FirstOrDefault(folder => folder.Id == id)
+                ?.ParentId;
+        }
+
+        return true;
     }
 
     private static void ResetFolderDropIndicator(Button? button)
@@ -743,6 +883,42 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
+    private async void Folder_Delete_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel node)
+        {
+            return;
+        }
+
+        if (node.Id == _viewModel.Configuration.UncategorizedFolderId)
+        {
+            System.Windows.MessageBox.Show(
+                "“未分类”不能删除。",
+                "删除文件夹",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var choice = System.Windows.MessageBox.Show(
+            "选择“是”：删除当前文件夹，子文件夹和快捷方式上移一层。\n\n"
+            + "选择“否”：删除整棵文件夹树及其中的所有快捷方式。\n\n"
+            + "真实磁盘文件夹不会被删除。",
+            $"删除“{node.Name}”",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Warning);
+        if (choice == MessageBoxResult.Cancel)
+        {
+            return;
+        }
+
+        await _viewModel.Explorer.DeleteFolderAsync(
+            node.Id,
+            choice == MessageBoxResult.Yes
+                ? FolderDeletionMode.MoveContentsToParent
+                : FolderDeletionMode.DeleteSubtree);
+    }
+
     private void Folder_Pin_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is NavigationFolderNodeViewModel node)
@@ -757,6 +933,25 @@ public partial class MainWindow : Window, IDisposable
         {
             _viewModel.Explorer.UnpinFolderCommand.Execute(node.Folder);
         }
+    }
+
+    private IEnumerable<string> BuildFolderPath(Guid folderId)
+    {
+        var path = new List<string>();
+        var current = _viewModel.Configuration.NavigationFolders.FirstOrDefault(folder =>
+            folder.Id == folderId);
+        var visited = new HashSet<Guid>();
+        while (current is not null && visited.Add(current.Id))
+        {
+            path.Add(current.Name);
+            current = current.ParentId is Guid parentId
+                ? _viewModel.Configuration.NavigationFolders.FirstOrDefault(folder =>
+                    folder.Id == parentId)
+                : null;
+        }
+
+        path.Reverse();
+        return path;
     }
 
     private void FocusSearch()

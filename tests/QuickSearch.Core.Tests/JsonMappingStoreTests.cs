@@ -29,7 +29,7 @@ public sealed class JsonMappingStoreTests
         var configuration = await store.LoadAsync();
 
         Assert.Equal(2, configuration.FindMappings("sales team").Count);
-        Assert.Equal(2, configuration.Settings.SchemaVersion);
+        Assert.Equal(3, configuration.Settings.SchemaVersion);
         Assert.Equal(2, configuration.Rules.Count);
         Assert.All(
             configuration.Rules,
