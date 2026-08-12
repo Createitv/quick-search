@@ -8,9 +8,15 @@
         ShowInTaskbar="False" Closing="Window_Closing">
   <Window.Resources>
     <HierarchicalDataTemplate DataType="{x:Type core:NavigationFolderNodeViewModel}" ItemsSource="{Binding Children}">
-      <Button Style="{StaticResource ExplorerTreeItemStyle}" Content="{Binding Name}"
+      <Button Style="{StaticResource ExplorerTreeItemStyle}"
               Command="{Binding DataContext.Organizer.SelectFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-              CommandParameter="{Binding Folder}" />
+              CommandParameter="{Binding Folder}">
+        <StackPanel Orientation="Horizontal">
+          <ui:SymbolIcon Margin="0,0,7,0" Symbol="Folder20" FontSize="17"
+                         Foreground="{DynamicResource RouteBlueBrush}" />
+          <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Button>
     </HierarchicalDataTemplate>
   </Window.Resources>
   <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CancelCommand}" /></Window.InputBindings>
@@ -18,20 +24,34 @@
   <Grid Background="{DynamicResource PaperBrush}">
     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
     <Border Padding="24,18" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
-      <StackPanel>
-        <TextBlock Text="设置" Style="{StaticResource WindowTitleStyle}" />
-        <TextBlock Margin="0,3,0,0" Text="通用选项、分类层级和快速打开规则" Style="{StaticResource SecondaryTextStyle}" />
+      <StackPanel Orientation="Horizontal">
+        <Border Width="42" Height="42" Margin="0,0,13,0" CornerRadius="12"
+                Background="{DynamicResource SoftBlueBrush}">
+          <ui:SymbolIcon Symbol="SettingsCogMultiple24" FontSize="21"
+                         Foreground="{DynamicResource RouteBlueBrush}" />
+        </Border>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="设置" Style="{StaticResource WindowTitleStyle}" />
+          <TextBlock Margin="0,3,0,0" Text="通用选项、分类层级和快速打开规则" Style="{StaticResource SecondaryTextStyle}" />
+        </StackPanel>
       </StackPanel>
     </Border>
 
     <TabControl Grid.Row="1" Margin="20,16,20,0">
-      <TabItem Header="通用">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Settings20" FontSize="16" />
+            <TextBlock Text="通用" />
+          </StackPanel>
+        </TabItem.Header>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Margin="12,18">
             <TextBlock Text="Everything" Style="{StaticResource SectionTitleStyle}" />
             <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
               <StackPanel Orientation="Horizontal">
-                <Ellipse Width="8" Height="8" Margin="0,0,9,0" Fill="{DynamicResource SignalCyanBrush}" VerticalAlignment="Center" />
+                <ui:SymbolIcon Margin="0,0,9,0" Symbol="Database20" FontSize="18"
+                               Foreground="{DynamicResource RouteBlueBrush}" />
                 <TextBlock Text="{Binding EverythingHealthText}" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
@@ -67,12 +87,21 @@
                 </StackPanel>
                 <StackPanel Grid.Column="2" Margin="18,0,0,0" Orientation="Horizontal"
                             VerticalAlignment="Top">
-                  <Button Content="立即检查" Style="{StaticResource QuietButtonStyle}"
-                          Command="{Binding Update.CheckNowCommand}" />
-                  <Button Margin="8,0,0,0" Content="下载并安装"
-                          Style="{StaticResource PrimaryButtonStyle}"
+                  <Button Style="{StaticResource QuietButtonStyle}"
+                          Command="{Binding Update.CheckNowCommand}">
+                    <StackPanel Orientation="Horizontal">
+                      <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowSync20" FontSize="16" />
+                      <TextBlock Text="立即检查" />
+                    </StackPanel>
+                  </Button>
+                  <Button Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}"
                           IsEnabled="{Binding Update.CanDownloadAndInstall}"
-                          Click="DownloadAndInstall_Click" />
+                          Click="DownloadAndInstall_Click">
+                    <StackPanel Orientation="Horizontal">
+                      <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowDownload20" FontSize="16" />
+                      <TextBlock Text="下载并安装" Foreground="White" />
+                    </StackPanel>
+                  </Button>
                 </StackPanel>
               </Grid>
             </Border>
@@ -80,7 +109,13 @@
         </ScrollViewer>
       </TabItem>
 
-      <TabItem Header="分类与规则">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="AppsListDetail20" FontSize="16" />
+            <TextBlock Text="分类与规则" />
+          </StackPanel>
+        </TabItem.Header>
         <Grid Margin="8,14,8,8">
           <Grid.ColumnDefinitions><ColumnDefinition Width="270" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
           <Border Grid.Column="0" Style="{StaticResource SurfaceCardStyle}" Padding="12">
@@ -98,15 +133,31 @@
                 </StackPanel>
               </Button>
               <StackPanel Grid.Row="3" Margin="0,9,0,0">
-                <Button Padding="10,7" Content="重命名当前文件夹…"
-                        Style="{StaticResource QuietButtonStyle}"
-                        Click="RenameFolder_Click" />
+                <Button Padding="10,7" Style="{StaticResource QuietButtonStyle}"
+                        Click="RenameFolder_Click">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,7,0" Symbol="Edit20" FontSize="16" />
+                    <TextBlock Text="重命名当前文件夹…" />
+                  </StackPanel>
+                </Button>
                 <Grid Margin="0,8,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <ComboBox ItemsSource="{Binding Organizer.Folders}" DisplayMemberPath="Name" SelectedItem="{Binding Organizer.MoveTargetFolder, Mode=TwoWay}" />
-                  <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="移动到" Command="{Binding Organizer.MoveSelectedFolderCommand}" />
+                  <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6"
+                          Command="{Binding Organizer.MoveSelectedFolderCommand}">
+                    <StackPanel Orientation="Horizontal">
+                      <ui:SymbolIcon Margin="0,0,6,0" Symbol="FolderArrowRight20" FontSize="16" />
+                      <TextBlock Text="移动到" />
+                    </StackPanel>
+                  </Button>
                 </Grid>
-                <Button Margin="0,8,0,0" Padding="10,6" Content="删除当前分类…" Style="{StaticResource QuietButtonStyle}" Click="DeleteFolder_Click" />
+                <Button Margin="0,8,0,0" Padding="10,6" Style="{StaticResource QuietButtonStyle}" Click="DeleteFolder_Click">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,7,0" Symbol="Delete20" FontSize="16"
+                                   Foreground="{DynamicResource ErrorBrush}" />
+                    <TextBlock Text="删除当前分类…" Foreground="{DynamicResource ErrorBrush}" />
+                  </StackPanel>
+                </Button>
               </StackPanel>
             </Grid>
           </Border>
@@ -119,7 +170,12 @@
                   <TextBlock Text="{Binding Organizer.SelectedFolder.Name, TargetNullValue=请选择分类}" Style="{StaticResource SectionTitleStyle}" />
                   <TextBlock Margin="0,3,0,0" Text="每条规则对应一个真实文件夹，可设置多个关键词" Style="{StaticResource SecondaryTextStyle}" />
                 </StackPanel>
-                <Button HorizontalAlignment="Right" Content="删除所选规则" Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.DeleteRuleCommand}" />
+                <Button HorizontalAlignment="Right" Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.DeleteRuleCommand}">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,6,0" Symbol="Delete20" FontSize="16" />
+                    <TextBlock Text="删除所选规则" />
+                  </StackPanel>
+                </Button>
               </Grid>
               <DataGrid Grid.Row="1" ItemsSource="{Binding Organizer.CurrentRules}" SelectedItem="{Binding Organizer.SelectedRule, Mode=TwoWay}"
                         AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
@@ -139,8 +195,18 @@
               <Grid Grid.Row="3" Margin="0,9,0,0">
                 <TextBlock Text="{Binding Organizer.Message}" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                  <Button Content="移动所选规则" Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.MoveSelectedRuleCommand}" />
-                  <Button Margin="8,0,0,0" Content="＋ 新建规则" Command="{Binding Organizer.AddRuleCommand}" />
+                  <Button Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.MoveSelectedRuleCommand}">
+                    <StackPanel Orientation="Horizontal">
+                      <ui:SymbolIcon Margin="0,0,6,0" Symbol="FolderArrowRight20" FontSize="16" />
+                      <TextBlock Text="移动所选规则" />
+                    </StackPanel>
+                  </Button>
+                  <Button Margin="8,0,0,0" Command="{Binding Organizer.AddRuleCommand}">
+                    <StackPanel Orientation="Horizontal">
+                      <ui:SymbolIcon Margin="0,0,6,0" Symbol="AddCircle20" FontSize="16" />
+                      <TextBlock Text="新建规则" />
+                    </StackPanel>
+                  </Button>
                 </StackPanel>
               </Grid>
             </Grid>
@@ -154,8 +220,18 @@
       <Grid>
         <TextBlock Text="{Binding Message}" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-          <Button Content="取消" Style="{StaticResource QuietButtonStyle}" Command="{Binding CancelCommand}" />
-          <Button Margin="8,0,0,0" Content="保存更改" IsDefault="True" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveCommand}" />
+          <Button Style="{StaticResource QuietButtonStyle}" Command="{Binding CancelCommand}">
+            <StackPanel Orientation="Horizontal">
+              <ui:SymbolIcon Margin="0,0,6,0" Symbol="Dismiss20" FontSize="16" />
+              <TextBlock Text="取消" />
+            </StackPanel>
+          </Button>
+          <Button Margin="8,0,0,0" IsDefault="True" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveCommand}">
+            <StackPanel Orientation="Horizontal">
+              <ui:SymbolIcon Margin="0,0,6,0" Symbol="Save20" FontSize="16" />
+              <TextBlock Text="保存更改" Foreground="White" />
+            </StackPanel>
+          </Button>
         </StackPanel>
       </Grid>
     </Border>

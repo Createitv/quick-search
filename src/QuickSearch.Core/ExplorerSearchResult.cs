@@ -13,7 +13,10 @@ public sealed record ExplorerSearchResult(
     string CategoryPath,
     string FolderPath,
     NavigationFolder? Folder,
-    FolderRule? Rule);
+    FolderRule? Rule)
+{
+    public string ShortcutText { get; init; } = string.Empty;
+}
 
 public sealed class ExplorerStatusEventArgs(
     string message,

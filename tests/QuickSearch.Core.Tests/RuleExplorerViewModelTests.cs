@@ -46,6 +46,32 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public void SearchResults_AssignCtrlNumberShortcutsToFirstNineMatches()
+    {
+        var configuration = new AppConfiguration();
+        var folder = configuration.AddNavigationFolder("命令", null);
+        for (var index = 1; index <= 11; index++)
+        {
+            configuration.AddRule(
+                $"命令 {index:00}",
+                ["command"],
+                $@"C:\Commands\{index:00}",
+                folder.Id);
+        }
+
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            new RecordingMappingStore(configuration),
+            new RecordingFolderOpener());
+
+        viewModel.SearchText = "command";
+
+        Assert.Equal("Ctrl+1", viewModel.SearchResults[0].ShortcutText);
+        Assert.Equal("Ctrl+9", viewModel.SearchResults[8].ShortcutText);
+        Assert.Equal(string.Empty, viewModel.SearchResults[9].ShortcutText);
+    }
+
+    [Fact]
     public async Task PinFolderAsync_PersistsAndRefreshesOrderedPins()
     {
         var configuration = CreateConfiguration();

@@ -17,7 +17,7 @@
     <StackPanel Orientation="Horizontal">
       <Border Width="42" Height="42" Margin="0,0,13,0" CornerRadius="12"
               Background="{DynamicResource SoftBlueBrush}">
-        <ui:SymbolIcon Symbol="FolderAdd24" FontSize="21"
+        <ui:SymbolIcon x:Name="FolderIcon" Symbol="FolderAdd24" FontSize="21"
                        Foreground="{DynamicResource RouteBlueBrush}" />
       </Border>
       <StackPanel VerticalAlignment="Center">
@@ -36,10 +36,20 @@
       <TextBlock x:Name="ValidationText" Foreground="{DynamicResource ErrorBrush}"
                  VerticalAlignment="Center" />
       <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-        <Button Content="取消" IsCancel="True" Style="{StaticResource QuietButtonStyle}" />
-        <Button x:Name="ConfirmButton" Margin="8,0,0,0" Content="创建"
+        <Button IsCancel="True" Style="{StaticResource QuietButtonStyle}">
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Dismiss20" FontSize="16" />
+            <TextBlock Text="取消" />
+          </StackPanel>
+        </Button>
+        <Button x:Name="ConfirmButton" Margin="8,0,0,0"
                 IsDefault="True" Style="{StaticResource PrimaryButtonStyle}"
-                Click="ConfirmButton_Click" />
+                Click="ConfirmButton_Click">
+          <StackPanel Orientation="Horizontal">
+            <ui:SymbolIcon Margin="0,0,6,0" Symbol="Checkmark20" FontSize="16" />
+            <TextBlock x:Name="ConfirmButtonText" Text="创建" Foreground="White" />
+          </StackPanel>
+        </Button>
       </StackPanel>
     </Grid>
   </Grid>

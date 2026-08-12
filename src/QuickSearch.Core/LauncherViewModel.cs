@@ -472,6 +472,49 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         return Task.CompletedTask;
     }
 
+    public async Task<bool> OpenSearchShortcutAsync(int shortcutNumber)
+    {
+        ThrowIfDisposed();
+        if (shortcutNumber is < 1 or > 9 || !Explorer.IsSearching)
+        {
+            return false;
+        }
+
+        var index = shortcutNumber - 1;
+        if (Explorer.SearchResults.Count > 0)
+        {
+            if (index >= Explorer.SearchResults.Count)
+            {
+                return false;
+            }
+
+            var result = Explorer.SearchResults[index];
+            if (result.Rule is not null)
+            {
+                await Explorer.OpenRuleAsync(result.Rule);
+            }
+            else if (result.Folder is not null)
+            {
+                Explorer.NavigateToFolder(result.Folder.Id);
+            }
+            else
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!IsEverythingSearchVisible || index >= Results.Count)
+        {
+            return false;
+        }
+
+        SelectedResult = Results[index];
+        await OpenSelectedAsync();
+        return true;
+    }
+
     private void SelectPreviousResult()
     {
         if (Results.Count == 0)
@@ -718,7 +761,15 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            Results = results.Take(20).ToArray();
+            Results = results
+                .Take(20)
+                .Select((result, index) => result with
+                {
+                    ShortcutText = index < 9
+                        ? $"Ctrl+{index + 1}"
+                        : string.Empty
+                })
+                .ToArray();
             SelectedResult = Results.FirstOrDefault();
             SetStatus(
                 FormatSearchStatus(_search.Health, Results.Count, _search.FailureMessage),

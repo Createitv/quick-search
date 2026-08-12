@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using Wpf.Ui.Controls;
 
 namespace QuickSearch.Windows;
 
@@ -15,7 +16,10 @@ public partial class FolderEditorDialog : Window
         Title = title;
         DialogTitle.Text = title;
         DialogDescription.Text = description;
-        ConfirmButton.Content = confirmText;
+        ConfirmButtonText.Text = confirmText;
+        FolderIcon.Symbol = string.IsNullOrWhiteSpace(initialName)
+            ? SymbolRegular.FolderAdd24
+            : SymbolRegular.Edit24;
         NameBox.Text = initialName;
         Loaded += (_, _) =>
         {

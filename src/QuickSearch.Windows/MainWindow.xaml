@@ -36,11 +36,19 @@
         </Grid>
         <Button.ContextMenu>
           <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
-            <MenuItem Header="新建子文件夹…" Click="Folder_NewChild_Click" />
-            <MenuItem Header="重命名…" Click="Folder_Rename_Click" />
+            <MenuItem Header="新建子文件夹…" Click="Folder_NewChild_Click">
+              <MenuItem.Icon><ui:SymbolIcon Symbol="FolderAdd20" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="重命名…" Click="Folder_Rename_Click">
+              <MenuItem.Icon><ui:SymbolIcon Symbol="Edit20" /></MenuItem.Icon>
+            </MenuItem>
             <Separator />
-            <MenuItem Header="收藏到顶部" Click="Folder_Pin_Click" />
-            <MenuItem Header="取消顶部收藏" Click="Folder_Unpin_Click" />
+            <MenuItem Header="固定到顶部" Click="Folder_Pin_Click">
+              <MenuItem.Icon><ui:SymbolIcon Symbol="Pin20" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="取消顶部固定" Click="Folder_Unpin_Click">
+              <MenuItem.Icon><ui:SymbolIcon Symbol="PinOff20" /></MenuItem.Icon>
+            </MenuItem>
           </ContextMenu>
         </Button.ContextMenu>
       </Button>
@@ -64,7 +72,7 @@
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <Border Width="38" Height="38" Margin="0,0,12,0" Background="{DynamicResource SoftBlueBrush}" CornerRadius="11">
-          <ui:SymbolIcon Symbol="Home24" FontSize="20" Foreground="{DynamicResource RouteBlueBrush}" />
+          <ui:SymbolIcon Symbol="Pin24" FontSize="20" Foreground="{DynamicResource RouteBlueBrush}" />
         </Border>
         <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding Explorer.PinnedFolders}">
@@ -75,7 +83,6 @@
               <DataTemplate>
                 <Button Margin="0,0,8,0"
                         Style="{StaticResource PinnedFolderButtonStyle}"
-                        Content="{Binding Name}"
                         Command="{Binding DataContext.Explorer.NavigateFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                         CommandParameter="{Binding}"
                         PreviewMouseLeftButtonDown="PinnedFolder_PreviewMouseLeftButtonDown"
@@ -83,7 +90,13 @@
                         AllowDrop="True"
                         DragOver="PinnedFolder_DragOver"
                         DragLeave="PinnedFolder_DragLeave"
-                        Drop="PinnedFolder_Drop" />
+                        Drop="PinnedFolder_Drop">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,7,0" Symbol="Pin16" FontSize="14"
+                                   Foreground="{DynamicResource RouteBlueBrush}" />
+                    <TextBlock Text="{Binding Name}" />
+                  </StackPanel>
+                </Button>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -139,7 +152,8 @@
                           Content="{Binding Name}"
                           Command="{Binding DataContext.Explorer.NavigateFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           CommandParameter="{Binding}" />
-                  <TextBlock Margin="5,0" Text="›" Foreground="{DynamicResource SlateBrush}" VerticalAlignment="Center" />
+                  <ui:SymbolIcon Margin="5,0" Symbol="ChevronRight12" FontSize="11"
+                                 Foreground="{DynamicResource SlateBrush}" />
                 </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -206,10 +220,15 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <DockPanel Grid.Row="1" Margin="0,4,0,10">
-            <Button DockPanel.Dock="Right" Padding="10,5" Content="＋ 新建快捷方式"
+            <Button DockPanel.Dock="Right" Padding="10,5"
                     AutomationProperties.Name="在当前文件夹中新建快捷方式"
                     Style="{StaticResource QuietButtonStyle}"
-                    Click="CurrentFolder_NewRule_Click" />
+                    Click="CurrentFolder_NewRule_Click">
+              <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Margin="0,0,6,0" Symbol="AddCircle20" FontSize="17" />
+                <TextBlock Text="新建快捷方式" />
+              </StackPanel>
+            </Button>
             <TextBlock Text="快捷方式" Style="{StaticResource SectionTitleStyle}" />
             <TextBlock Margin="12,1,0,0" Text="拖到左侧文件夹即可整理" Style="{StaticResource SecondaryTextStyle}" />
           </DockPanel>
@@ -239,12 +258,17 @@
                           ToolTip="单击打开；拖到左侧文件夹可移动">
                     <Grid>
                       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                      <TextBlock Margin="0,0,11,0" Text="⠿" Foreground="{DynamicResource SlateBrush}" VerticalAlignment="Center" />
+                      <ui:SymbolIcon Margin="0,0,11,0" Symbol="ReOrderDotsVertical20" FontSize="18"
+                                     Foreground="{DynamicResource SlateBrush}" />
                       <StackPanel Grid.Column="1">
                         <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="SemiBold" />
                         <TextBlock Margin="0,4,20,0" Text="{Binding FolderPath}" Foreground="{DynamicResource SlateBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
-                      <TextBlock Grid.Column="2" Text="打开  →" Foreground="{DynamicResource RouteBlueBrush}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Margin="0,0,6,0" Text="打开" Foreground="{DynamicResource RouteBlueBrush}" />
+                        <ui:SymbolIcon Symbol="OpenFolder20" FontSize="17"
+                                       Foreground="{DynamicResource RouteBlueBrush}" />
+                      </StackPanel>
                     </Grid>
                   </Button>
                 </DataTemplate>
@@ -258,9 +282,13 @@
           <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
           <DockPanel Margin="0,0,0,12">
             <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButtonStyle}"
-                    Content="使用 Everything 搜索文件夹"
                     Command="{Binding SearchEverythingCommand}"
-                    Visibility="{Binding CanSearchEverything, Converter={StaticResource BoolToVisibility}}" />
+                    Visibility="{Binding CanSearchEverything, Converter={StaticResource BoolToVisibility}}">
+              <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Margin="0,0,7,0" Symbol="FolderSearch20" FontSize="17" />
+                <TextBlock Text="使用 Everything 搜索文件夹" Foreground="White" />
+              </StackPanel>
+            </Button>
             <StackPanel>
               <TextBlock Text="搜索结果" Style="{StaticResource SectionTitleStyle}" />
               <TextBlock Margin="0,3,0,0" Text="优先匹配本地分类、规则名称、关键词和路径" Style="{StaticResource SecondaryTextStyle}" />
@@ -279,7 +307,28 @@
                             <Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static core:ExplorerSearchResultKind.Rule}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
                           </Style>
                         </Button.Style>
-                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold" /><TextBlock Margin="0,4,0,0" Text="{Binding CategoryPath}" Foreground="{DynamicResource SlateBrush}" /></StackPanel>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <Border Width="34" Height="34" Margin="0,0,11,0" CornerRadius="9"
+                                  Background="{DynamicResource SoftBlueBrush}">
+                            <ui:SymbolIcon Symbol="Folder20" FontSize="18"
+                                           Foreground="{DynamicResource RouteBlueBrush}" />
+                          </Border>
+                          <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                            <TextBlock Margin="0,4,0,0" Text="{Binding CategoryPath}"
+                                       Foreground="{DynamicResource SlateBrush}" />
+                          </StackPanel>
+                          <Border Grid.Column="2" Margin="14,0,0,0"
+                                  Tag="{Binding ShortcutText}" Style="{StaticResource ShortcutBadgeStyle}">
+                            <TextBlock Text="{Binding ShortcutText}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource RouteBlueBrush}" />
+                          </Border>
+                        </Grid>
                       </Button>
                       <Button Command="{Binding DataContext.Explorer.OpenRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                               CommandParameter="{Binding Rule}">
@@ -289,7 +338,30 @@
                             <Style.Triggers><DataTrigger Binding="{Binding Kind}" Value="{x:Static core:ExplorerSearchResultKind.Rule}"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
                           </Style>
                         </Button.Style>
-                        <StackPanel><TextBlock Text="{Binding Title}" FontWeight="SemiBold" /><TextBlock Margin="0,4,0,0" Text="{Binding CategoryPath}" Foreground="{DynamicResource SlateBrush}" /><TextBlock Margin="0,2,0,0" Text="{Binding FolderPath}" Foreground="{DynamicResource SlateBrush}" FontSize="11" /></StackPanel>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <Border Width="34" Height="34" Margin="0,0,11,0" CornerRadius="9"
+                                  Background="{DynamicResource SoftCyanBrush}">
+                            <ui:SymbolIcon Symbol="FolderLink20" FontSize="18"
+                                           Foreground="{DynamicResource RouteBlueBrush}" />
+                          </Border>
+                          <StackPanel Grid.Column="1">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                            <TextBlock Margin="0,4,0,0" Text="{Binding CategoryPath}"
+                                       Foreground="{DynamicResource SlateBrush}" />
+                            <TextBlock Margin="0,2,0,0" Text="{Binding FolderPath}"
+                                       Foreground="{DynamicResource SlateBrush}" FontSize="11" />
+                          </StackPanel>
+                          <Border Grid.Column="2" Margin="14,0,0,0"
+                                  Tag="{Binding ShortcutText}" Style="{StaticResource ShortcutBadgeStyle}">
+                            <TextBlock Text="{Binding ShortcutText}" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource RouteBlueBrush}" />
+                          </Border>
+                        </Grid>
                       </Button>
                     </Grid>
                   </DataTemplate>
@@ -303,7 +375,27 @@
                   <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding OpenSelectedCommand}" />
                 </ListBox.InputBindings>
                 <ListBox.ItemTemplate>
-                  <DataTemplate><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Margin="0,4,0,0" Text="{Binding FullPath}" Foreground="{DynamicResource SlateBrush}" /></StackPanel></DataTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <ui:SymbolIcon Margin="0,0,11,0" Symbol="FolderSearch20" FontSize="18"
+                                     Foreground="{DynamicResource RouteBlueBrush}" />
+                      <StackPanel Grid.Column="1">
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                        <TextBlock Margin="0,4,0,0" Text="{Binding FullPath}"
+                                   Foreground="{DynamicResource SlateBrush}" />
+                      </StackPanel>
+                      <Border Grid.Column="2" Margin="14,0,0,0"
+                              Tag="{Binding ShortcutText}" Style="{StaticResource ShortcutBadgeStyle}">
+                        <TextBlock Text="{Binding ShortcutText}" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource RouteBlueBrush}" />
+                      </Border>
+                    </Grid>
+                  </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
             </StackPanel>
@@ -315,7 +407,12 @@
     <Border Grid.Row="2" Padding="18,0" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Background="{DynamicResource MutedSurfaceBrush}">
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-        <TextBlock Text="Esc 隐藏 · Ctrl+K 搜索" Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <ui:SymbolIcon Margin="0,0,7,0" Symbol="Keyboard20" FontSize="16"
+                         Foreground="{DynamicResource SlateBrush}" />
+          <TextBlock Text="Esc 隐藏 · Ctrl+K 搜索 · Ctrl+1–9 快速打开"
+                     Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
+        </StackPanel>
         <TextBlock Grid.Column="1" Margin="18,0" Text="{Binding Status}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource SlateBrush}" />
         <Button Grid.Column="2" Width="34" Height="34" Padding="0"
                 ToolTip="设置" AutomationProperties.Name="设置"

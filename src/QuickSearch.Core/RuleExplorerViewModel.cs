@@ -400,6 +400,10 @@ public sealed class RuleExplorerViewModel : ObservableObject
         SearchResults = results
             .OrderBy(result => result.Kind)
             .ThenBy(result => result.Title, StringComparer.OrdinalIgnoreCase)
+            .Select((result, index) => result with
+            {
+                ShortcutText = GetShortcutText(index)
+            })
             .ToArray();
     }
 
@@ -455,6 +459,11 @@ public sealed class RuleExplorerViewModel : ObservableObject
 
     private static bool MatchesTokens(string searchable, IEnumerable<string> tokens) =>
         tokens.All(token => searchable.Contains(token, StringComparison.OrdinalIgnoreCase));
+
+    private static string GetShortcutText(int zeroBasedIndex) =>
+        zeroBasedIndex is >= 0 and < 9
+            ? $"Ctrl+{zeroBasedIndex + 1}"
+            : string.Empty;
 
     private static NavigationFolder EmptyFolder() => new(
         Guid.Empty,

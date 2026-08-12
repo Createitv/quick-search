@@ -240,14 +240,36 @@ public partial class MainWindow : Window, IDisposable
 
     private void Window_Activated(object sender, EventArgs e) => FocusSearch();
 
-    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.K && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             FocusSearch();
             e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers == ModifierKeys.Control
+            && GetSearchShortcutNumber(e.Key) is int shortcutNumber
+            && await _viewModel.OpenSearchShortcutAsync(shortcutNumber))
+        {
+            e.Handled = true;
         }
     }
+
+    private static int? GetSearchShortcutNumber(Key key) => key switch
+    {
+        Key.D1 or Key.NumPad1 => 1,
+        Key.D2 or Key.NumPad2 => 2,
+        Key.D3 or Key.NumPad3 => 3,
+        Key.D4 or Key.NumPad4 => 4,
+        Key.D5 or Key.NumPad5 => 5,
+        Key.D6 or Key.NumPad6 => 6,
+        Key.D7 or Key.NumPad7 => 7,
+        Key.D8 or Key.NumPad8 => 8,
+        Key.D9 or Key.NumPad9 => 9,
+        _ => null
+    };
 
     private void PinnedFolder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

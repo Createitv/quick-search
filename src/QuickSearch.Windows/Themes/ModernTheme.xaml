@@ -305,4 +305,18 @@
     <Setter Property="FontSize" Value="17" />
     <Setter Property="Foreground" Value="{DynamicResource SlateBrush}" />
   </Style>
+
+  <Style x:Key="ShortcutBadgeStyle" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource SoftBlueBrush}" />
+    <Setter Property="BorderBrush" Value="#CBD9FA" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="7,3" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Style.Triggers>
+      <Trigger Property="Tag" Value="">
+        <Setter Property="Visibility" Value="Collapsed" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
 </ResourceDictionary>

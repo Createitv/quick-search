@@ -138,6 +138,69 @@ public sealed class LauncherViewModelTests
     }
 
     [Fact]
+    public async Task OpenSearchShortcutAsync_OpensMatchingLocalRule()
+    {
+        var configuration = new AppConfiguration();
+        var folder = configuration.AddNavigationFolder("项目", null);
+        configuration.AddRule("Alpha", ["quick"], "/quick/alpha", folder.Id);
+        configuration.AddRule("Beta", ["quick"], "/quick/beta", folder.Id);
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(configuration),
+            opener: opener,
+            folderExists: _ => true);
+        await viewModel.InitializeAsync();
+        viewModel.Explorer.SearchText = "quick";
+
+        var opened = await viewModel.OpenSearchShortcutAsync(2);
+
+        Assert.True(opened);
+        Assert.Equal(["/quick/beta"], opener.OpenedPaths);
+    }
+
+    [Fact]
+    public async Task EverythingResults_AssignAndOpenCtrlNumberShortcuts()
+    {
+        var search = new FakeFolderSearch
+        {
+            Results =
+            [
+                new FolderSearchResult("One", "/one"),
+                new FolderSearchResult("Two", "/two")
+            ]
+        };
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            search: search,
+            opener: opener);
+        await viewModel.InitializeAsync();
+        viewModel.Explorer.SearchText = "folder";
+        await viewModel.SearchEverythingAsync();
+
+        var opened = await viewModel.OpenSearchShortcutAsync(2);
+
+        Assert.Equal("Ctrl+1", viewModel.Results[0].ShortcutText);
+        Assert.Equal("Ctrl+2", viewModel.Results[1].ShortcutText);
+        Assert.True(opened);
+        Assert.Equal(["/two"], opener.OpenedPaths);
+    }
+
+    [Fact]
+    public async Task OpenSearchShortcutAsync_IgnoresUnavailableNumbers()
+    {
+        var opener = new FakeFolderOpener();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            opener: opener);
+        await viewModel.InitializeAsync();
+
+        Assert.False(await viewModel.OpenSearchShortcutAsync(0));
+        Assert.False(await viewModel.OpenSearchShortcutAsync(10));
+        Assert.Empty(opener.OpenedPaths);
+    }
+
+    [Fact]
     public async Task InitializeAsync_PopulatesExplorerFromLoadedConfiguration()
     {
         var configuration = new AppConfiguration();
