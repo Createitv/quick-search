@@ -19,6 +19,7 @@ public sealed class SettingsViewModel : ObservableObject
     private IReadOnlyList<MappingGroupEditorViewModel> _filteredMappingGroups = [];
     private MappingGroupEditorViewModel? _selectedMappingGroup;
     private bool _isSaving;
+    private bool _mappingGroupsDirty;
 
     public SettingsViewModel(
         AppConfiguration configuration,
@@ -37,6 +38,7 @@ public sealed class SettingsViewModel : ObservableObject
         _hotkey = hotkey;
         _startup = startup;
         _search = search;
+        Organizer = new NavigationOrganizerViewModel(configuration);
 
         AddMappingCommand = new RelayCommand(AddMapping);
         DeleteMappingCommand = new RelayCommand(
@@ -57,6 +59,8 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<MappingGroupEditorViewModel> MappingGroups { get; } = [];
 
     public ObservableCollection<MappingGroupEditorViewModel> Mappings => MappingGroups;
+
+    public NavigationOrganizerViewModel Organizer { get; }
 
     public IReadOnlyList<MappingGroupEditorViewModel> FilteredMappingGroups
     {
@@ -158,6 +162,7 @@ public sealed class SettingsViewModel : ObservableObject
     {
         Shortcut = _configuration.Settings.GlobalShortcut;
         StartWithWindows = _configuration.Settings.StartWithWindows;
+        Organizer.BeginEdit(_configuration);
         foreach (var group in MappingGroups)
         {
             group.PropertyChanged -= MappingGroup_PropertyChanged;
@@ -186,6 +191,7 @@ public sealed class SettingsViewModel : ObservableObject
         MappingFilter = string.Empty;
         SelectedMappingGroup = null;
         Message = string.Empty;
+        _mappingGroupsDirty = false;
         RefreshFilteredMappingGroups();
         RefreshEverythingHealth();
     }
@@ -212,6 +218,7 @@ public sealed class SettingsViewModel : ObservableObject
 
     public void AddMapping()
     {
+        _mappingGroupsDirty = true;
         MappingFilter = string.Empty;
         var group = new MappingGroupEditorViewModel();
         group.PropertyChanged += MappingGroup_PropertyChanged;
@@ -228,6 +235,7 @@ public sealed class SettingsViewModel : ObservableObject
         }
 
         var selected = SelectedMappingGroup;
+        _mappingGroupsDirty = true;
         var index = FilteredMappingGroups.ToList().IndexOf(selected);
         selected.PropertyChanged -= MappingGroup_PropertyChanged;
         MappingGroups.Remove(selected);
@@ -319,12 +327,17 @@ public sealed class SettingsViewModel : ObservableObject
     private AppConfiguration BuildCandidate(string shortcut)
     {
         ValidateMappingGroups();
-        var candidate = _configuration.Clone();
+        var candidate = Organizer.BuildCandidate();
         candidate.Settings = candidate.Settings with
         {
             GlobalShortcut = shortcut,
             StartWithWindows = StartWithWindows
         };
+
+        if (!_mappingGroupsDirty)
+        {
+            return candidate;
+        }
 
         var desiredMappings = new Dictionary<string, (string Alias, string Path)>(
             StringComparer.Ordinal);
@@ -394,6 +407,7 @@ public sealed class SettingsViewModel : ObservableObject
         object? sender,
         PropertyChangedEventArgs e)
     {
+        _mappingGroupsDirty = true;
         RefreshFilteredMappingGroups();
     }
 
