@@ -52,16 +52,16 @@ internal static class Program
                 return 2;
             }
 
-            Thread.Sleep(250);
-            application.Dispatcher.Invoke(
-                () => { },
-                DispatcherPriority.Render);
             var launcherSearchBox = launcherWindow.FindName("LauncherSearchBox")
                 as System.Windows.Controls.TextBox;
             var launcherResults = launcherWindow.FindName("ResultsList")
                 as System.Windows.Controls.ListBox;
-            if (launcherSearchBox?.Text != "项目文件"
-                || launcherResults?.Items.Count != 1)
+            if (launcherSearchBox is null
+                || launcherResults is null
+                || !WaitUntil(
+                    application.Dispatcher,
+                    () => launcherSearchBox.Text == "项目文件"
+                        && launcherResults.Items.Count == 1))
             {
                 Console.Error.WriteLine("Clipboard match was not shown in the quick launcher.");
                 return 2;
@@ -70,12 +70,10 @@ internal static class Program
             clipboard.Text = "没有任何结果";
             launcherWindow.Hide();
             mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);
-            Thread.Sleep(250);
-            application.Dispatcher.Invoke(
-                () => { },
-                DispatcherPriority.Render);
-            if (launcherSearchBox.Text.Length != 0
-                || launcherResults.Items.Count != 0)
+            if (!WaitUntil(
+                    application.Dispatcher,
+                    () => launcherSearchBox.Text.Length == 0
+                        && launcherResults.Items.Count == 0))
             {
                 var launcherState = launcherWindow.DataContext as QuickLauncherViewModel;
                 Console.Error.WriteLine(
@@ -178,6 +176,30 @@ internal static class Program
         configuration.AddRule("项目文件", ["项目", "客户"], @"C:\Projects", delivery.Id);
         configuration.PinFolder(projects.Id);
         return configuration;
+    }
+
+    private static bool WaitUntil(
+        Dispatcher dispatcher,
+        Func<bool> condition,
+        int timeoutMilliseconds = 2000)
+    {
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMilliseconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return true;
+            }
+
+            var frame = new DispatcherFrame();
+            dispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() => frame.Continue = false));
+            Dispatcher.PushFrame(frame);
+            Thread.Sleep(10);
+        }
+
+        return condition();
     }
 }
 
