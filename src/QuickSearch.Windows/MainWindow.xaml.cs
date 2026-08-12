@@ -29,7 +29,6 @@ public partial class MainWindow : Window, IDisposable
     private GlobalHotkey? _globalLauncherHotkey;
     private string? _hotkeyInitializationFailure;
     private SettingsViewModel? _settingsViewModel;
-    private SettingsWindow? _settingsWindow;
     private readonly QuickLauncherViewModel _quickLauncherViewModel;
     private QuickLauncherWindow? _quickLauncherWindow;
     private Point _pinDragStart;
@@ -122,6 +121,7 @@ public partial class MainWindow : Window, IDisposable
 
     public void ShowLauncher()
     {
+        ShowExplorerPage();
         Show();
         WindowState = WindowState.Normal;
         Activate();
@@ -139,7 +139,7 @@ public partial class MainWindow : Window, IDisposable
                 _hotkeyInitializationFailure ?? "快捷键服务尚未就绪。");
         }
 
-        if (_settingsWindow is null)
+        if (_settingsViewModel is null)
         {
             if (_launcherHotkey is null)
             {
@@ -157,17 +157,17 @@ public partial class MainWindow : Window, IDisposable
                 _update,
                 _launcherHotkey);
             _settingsViewModel.Saved += SettingsViewModel_Saved;
+            _settingsViewModel.HideRequested += SettingsViewModel_HideRequested;
             _settingsViewModel.QuickLauncherRequested += SettingsViewModel_QuickLauncherRequested;
-            _settingsWindow = new SettingsWindow(_settingsViewModel)
-            {
-                Owner = this
-            };
+            GeneralSettingsPage.DataContext = _settingsViewModel;
         }
 
         _ = _settingsViewModel!.BeginEditAsync();
-        _settingsWindow.Show();
-        _settingsWindow.WindowState = WindowState.Normal;
-        _settingsWindow.Activate();
+        ExplorerPage.Visibility = Visibility.Collapsed;
+        GeneralSettingsPage.Visibility = Visibility.Visible;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
     }
 
     public void ShowQuickLauncher(bool hideWhenDeactivated = true)
@@ -186,7 +186,6 @@ public partial class MainWindow : Window, IDisposable
     public void ExitApplication()
     {
         _allowClose = true;
-        _settingsWindow?.AllowApplicationExit();
         _quickLauncherWindow?.AllowApplicationExit();
         Close();
         System.Windows.Application.Current.Shutdown();
@@ -199,10 +198,10 @@ public partial class MainWindow : Window, IDisposable
         if (_settingsViewModel is not null)
         {
             _settingsViewModel.Saved -= SettingsViewModel_Saved;
+            _settingsViewModel.HideRequested -= SettingsViewModel_HideRequested;
             _settingsViewModel.QuickLauncherRequested -= SettingsViewModel_QuickLauncherRequested;
         }
 
-        _settingsWindow?.AllowApplicationExit();
         if (_quickLauncherWindow is not null)
         {
             _quickLauncherWindow.SettingsRequested -= QuickLauncherWindow_SettingsRequested;
@@ -316,16 +315,25 @@ public partial class MainWindow : Window, IDisposable
     private void SettingsViewModel_Saved(object? sender, EventArgs e) =>
         _viewModel.RefreshConfiguration();
 
+    private void SettingsViewModel_HideRequested(object? sender, EventArgs e) =>
+        ShowExplorerPage();
+
     private void SettingsViewModel_QuickLauncherRequested(object? sender, EventArgs e)
     {
-        _settingsWindow?.Hide();
+        ShowExplorerPage();
         ShowQuickLauncher();
     }
 
     private void QuickLauncherWindow_SettingsRequested(object? sender, EventArgs e) =>
         ShowSettings();
 
-    private void Window_Activated(object sender, EventArgs e) => FocusSearch();
+    private void Window_Activated(object sender, EventArgs e)
+    {
+        if (ExplorerPage.Visibility == Visibility.Visible)
+        {
+            FocusSearch();
+        }
+    }
 
     private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -367,6 +375,13 @@ public partial class MainWindow : Window, IDisposable
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (GeneralSettingsPage.Visibility == Visibility.Visible && e.Key == Key.Escape)
+        {
+            _settingsViewModel?.Cancel();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key == Key.K && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             FocusSearch();
@@ -952,6 +967,36 @@ public partial class MainWindow : Window, IDisposable
 
         path.Reverse();
         return path;
+    }
+
+    private void ShowExplorerPage()
+    {
+        GeneralSettingsPage.Visibility = Visibility.Collapsed;
+        ExplorerPage.Visibility = Visibility.Visible;
+        if (IsVisible)
+        {
+            FocusSearch();
+        }
+    }
+
+    private async void Settings_DownloadAndInstall_Click(object sender, RoutedEventArgs e)
+    {
+        if (_settingsViewModel?.Update is null
+            || !_settingsViewModel.Update.CanDownloadAndInstall)
+        {
+            return;
+        }
+
+        var choice = System.Windows.MessageBox.Show(
+            $"将下载并安装 QuickSearch {_settingsViewModel.Update.LatestVersion}。\n\n"
+            + "安装包通过 SHA-256 校验后，QuickSearch 会退出并完成更新。是否继续？",
+            "安装更新",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Information);
+        if (choice == System.Windows.MessageBoxResult.Yes)
+        {
+            await _settingsViewModel.Update.DownloadAndInstallAsync();
+        }
     }
 
     private void FocusSearch()

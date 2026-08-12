@@ -137,7 +137,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1">
+    <Grid x:Name="ExplorerPage" Grid.Row="1">
       <Grid.ColumnDefinitions>
         <ColumnDefinition x:Name="SidebarColumn" Width="210" />
         <ColumnDefinition Width="*" />
@@ -494,6 +494,182 @@
           </ScrollViewer>
         </Grid>
       </Grid>
+    </Grid>
+
+    <Grid x:Name="GeneralSettingsPage" Grid.Row="1" Visibility="Collapsed"
+          Background="{DynamicResource PaperBrush}"
+          AutomationProperties.Name="通用设置页面">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Border Padding="28,22,28,18" BorderBrush="{DynamicResource LineBrush}"
+              BorderThickness="0,0,0,1">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <Button Width="36" Height="36" Margin="0,2,14,0" Padding="0"
+                  VerticalAlignment="Top" ToolTip="返回文件夹"
+                  AutomationProperties.Name="返回文件夹"
+                  Style="{StaticResource QuietButtonStyle}"
+                  Command="{Binding CancelCommand}">
+            <ui:SymbolIcon Symbol="ArrowLeft20" FontSize="18" />
+          </Button>
+          <Border Grid.Column="1" Width="44" Height="44" Margin="0,0,14,0"
+                  CornerRadius="12" Background="{DynamicResource SoftBlueBrush}">
+            <ui:SymbolIcon Symbol="Settings24" FontSize="22"
+                           Foreground="{DynamicResource RouteBlueBrush}" />
+          </Border>
+          <StackPanel Grid.Column="2" VerticalAlignment="Center">
+            <TextBlock Text="通用设置" Style="{StaticResource WindowTitleStyle}" />
+            <TextBlock Margin="0,3,0,0" Text="快捷键、启动行为和应用更新"
+                       Style="{StaticResource SecondaryTextStyle}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="28,22,28,26" MaxWidth="880" HorizontalAlignment="Center">
+          <TextBlock Text="搜索服务" Style="{StaticResource SectionTitleStyle}" />
+          <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Border Width="42" Height="42" Margin="0,0,14,0" CornerRadius="12"
+                      Background="{DynamicResource SoftCyanBrush}">
+                <ui:SymbolIcon Symbol="Database20" FontSize="20"
+                               Foreground="{DynamicResource RouteBlueBrush}" />
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="Everything" FontWeight="SemiBold" />
+                <TextBlock Margin="0,4,0,0" Text="{Binding EverythingHealthText}"
+                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <TextBlock Text="快捷键" Style="{StaticResource SectionTitleStyle}" />
+          <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="剪贴板快速打开" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox Margin="0,7,0,0"
+                         AutomationProperties.Name="剪贴板快速打开快捷键"
+                         Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Margin="2,6,0,0" Text="复制关键词后使用，直接打开匹配的文件夹。"
+                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="桌面快速启动器" Style="{StaticResource FieldLabelStyle}" />
+                <TextBox Margin="0,7,0,0"
+                         AutomationProperties.Name="桌面快速启动器快捷键"
+                         Text="{Binding LauncherShortcut, UpdateSourceTrigger=PropertyChanged}" />
+                <DockPanel Margin="2,6,0,0">
+                  <Button DockPanel.Dock="Right" Margin="12,-5,0,0" Padding="9,4"
+                          Style="{StaticResource QuietButtonStyle}"
+                          Command="{Binding OpenQuickLauncherCommand}">
+                    <TextBlock Text="试一下" Foreground="{DynamicResource RouteBlueBrush}" />
+                  </Button>
+                  <TextBlock Text="默认 Alt+K，随时搜索应用、文件和快捷方式。"
+                             TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+                </DockPanel>
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <TextBlock Text="启动行为" Style="{StaticResource SectionTitleStyle}" />
+          <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
+            <StackPanel>
+              <CheckBox Content="登录 Windows 后自动启动 QuickSearch"
+                        IsChecked="{Binding StartWithWindows}" />
+              <CheckBox Margin="0,14,0,0" Content="每次启动时自动检查更新"
+                        IsChecked="{Binding AutomaticallyCheckForUpdates}" />
+            </StackPanel>
+          </Border>
+
+          <TextBlock Text="应用更新" Style="{StaticResource SectionTitleStyle}" />
+          <Border Margin="0,10,0,0" Style="{StaticResource SurfaceCardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Border Width="42" Height="42" Margin="0,0,14,0" CornerRadius="12"
+                      Background="{DynamicResource SoftBlueBrush}">
+                <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="21"
+                               Foreground="{DynamicResource RouteBlueBrush}" />
+              </Border>
+              <StackPanel Grid.Column="1">
+                <TextBlock FontWeight="SemiBold">
+                  <Run Text="当前版本 " /><Run Text="{Binding Update.InstalledVersion, Mode=OneWay}" />
+                  <Run Text=" · 最新版本 " /><Run Text="{Binding Update.LatestVersion, Mode=OneWay}" />
+                </TextBlock>
+                <TextBlock Margin="0,4,0,0" Text="{Binding Update.StatusText}"
+                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+                <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
+                             Value="{Binding Update.DownloadProgress, Mode=OneWay}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Margin="18,0,0,0" Orientation="Horizontal"
+                          VerticalAlignment="Top">
+                <Button Style="{StaticResource QuietButtonStyle}"
+                        Command="{Binding Update.CheckNowCommand}">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowSync20" FontSize="16" />
+                    <TextBlock Text="检查更新" />
+                  </StackPanel>
+                </Button>
+                <Button Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}"
+                        IsEnabled="{Binding Update.CanDownloadAndInstall}"
+                        Click="Settings_DownloadAndInstall_Click">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowDownload20" FontSize="16" />
+                    <TextBlock Text="下载并安装" Foreground="White" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Row="2" Padding="28,14" BorderBrush="{DynamicResource LineBrush}"
+              BorderThickness="0,1,0,0" Background="{DynamicResource MutedSurfaceBrush}">
+        <Grid MaxWidth="880" HorizontalAlignment="Center">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="{Binding Message}" TextWrapping="Wrap"
+                     VerticalAlignment="Center" Foreground="{DynamicResource SlateBrush}" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button Padding="14,8" Style="{StaticResource QuietButtonStyle}"
+                    Command="{Binding CancelCommand}">
+              <TextBlock Text="取消" />
+            </Button>
+            <Button Margin="8,0,0,0" Padding="16,8"
+                    Style="{StaticResource PrimaryButtonStyle}"
+                    Command="{Binding SaveCommand}">
+              <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Margin="0,0,6,0" Symbol="Save20" FontSize="16" />
+                <TextBlock Text="保存设置" Foreground="White" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
     </Grid>
 
     <Border Grid.Row="2" Padding="18,0" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Background="{DynamicResource MutedSurfaceBrush}">

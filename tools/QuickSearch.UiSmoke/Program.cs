@@ -55,22 +55,27 @@ internal static class Program
             application.Dispatcher.Invoke(
                 () => { },
                 DispatcherPriority.Render);
-            var window = application.Windows
-                .OfType<SettingsWindow>()
-                .SingleOrDefault();
-            if (window is null || !window.IsVisible)
+            var settingsPage = mainWindow.FindName("GeneralSettingsPage")
+                as System.Windows.FrameworkElement;
+            if (settingsPage is null || settingsPage.Visibility != System.Windows.Visibility.Visible)
             {
-                Console.Error.WriteLine("Settings window did not become visible.");
+                Console.Error.WriteLine("In-window general settings page did not become visible.");
                 return 2;
             }
 
-            window.UpdateLayout();
+            if (application.Windows.OfType<System.Windows.Window>()
+                .Any(window => window != mainWindow && window.IsVisible))
+            {
+                Console.Error.WriteLine("Settings unexpectedly opened a separate window.");
+                return 2;
+            }
+
+            mainWindow.UpdateLayout();
             application.Dispatcher.Invoke(
                 () => { },
                 DispatcherPriority.Render);
-            window.AllowApplicationExit();
             mainWindow.ExitApplication();
-            Console.WriteLine("QuickSearch settings window smoke check passed.");
+            Console.WriteLine("QuickSearch in-window settings smoke check passed.");
             return 0;
         }
         catch (Exception exception)
