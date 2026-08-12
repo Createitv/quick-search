@@ -17,6 +17,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IFolderSearch _search;
     private readonly IStartupRegistration _startup;
     private readonly EverythingBootstrapViewModel _bootstrap;
+    private readonly ApplicationUpdateViewModel _update;
     private IHotkeyRegistration? _hotkey;
     private GlobalHotkey? _globalHotkey;
     private string? _hotkeyInitializationFailure;
@@ -24,6 +25,8 @@ public partial class MainWindow : Window, IDisposable
     private SettingsWindow? _settingsWindow;
     private Point _pinDragStart;
     private NavigationFolder? _draggedPin;
+    private Point _ruleDragStart;
+    private FolderRule? _draggedRule;
     private bool _allowClose;
 
     public MainWindow(
@@ -31,18 +34,21 @@ public partial class MainWindow : Window, IDisposable
         IMappingStore store,
         IFolderSearch search,
         IStartupRegistration startup,
-        EverythingBootstrapViewModel bootstrap)
+        EverythingBootstrapViewModel bootstrap,
+        ApplicationUpdateViewModel update)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(search);
         ArgumentNullException.ThrowIfNull(startup);
         ArgumentNullException.ThrowIfNull(bootstrap);
+        ArgumentNullException.ThrowIfNull(update);
         _viewModel = viewModel;
         _store = store;
         _search = search;
         _startup = startup;
         _bootstrap = bootstrap;
+        _update = update;
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;
@@ -52,10 +58,46 @@ public partial class MainWindow : Window, IDisposable
 
     public EverythingBootstrapViewModel Bootstrap => _bootstrap;
 
+    public ApplicationUpdateViewModel Update => _update;
+
     public async Task InitializeAsync()
     {
         await _viewModel.InitializeAsync();
         ApplyInitialPlatformSettings();
+    }
+
+    public async Task CheckForUpdatesOnStartupAsync()
+    {
+        var settings = _viewModel.Configuration.Settings;
+        var checkedAtUtc = DateTimeOffset.UtcNow;
+        if (!UpdateCheckPolicy.ShouldCheckAutomatically(
+                settings.AutomaticallyCheckForUpdates,
+                settings.LastUpdateCheckAtUtc,
+                checkedAtUtc))
+        {
+            return;
+        }
+
+        await _update.CheckNowAsync();
+        try
+        {
+            _viewModel.Configuration.Settings =
+                _viewModel.Configuration.Settings with
+                {
+                    LastUpdateCheckAtUtc = checkedAtUtc
+                };
+            await _store.SaveAsync(_viewModel.Configuration);
+        }
+        catch (Exception exception)
+        {
+            _viewModel.ReportStatus($"无法记录更新检查时间：{exception.Message}");
+        }
+
+        if (_update.State == ApplicationUpdateState.Available)
+        {
+            _viewModel.ReportStatus(
+                $"发现 QuickSearch {_update.LatestVersion}，可在设置中安装。");
+        }
     }
 
     public async Task ActivateFromClipboardAsync()
@@ -103,7 +145,8 @@ public partial class MainWindow : Window, IDisposable
                 _store,
                 _hotkey,
                 _startup,
-                _search);
+                _search,
+                _update);
             _settingsViewModel.Saved += SettingsViewModel_Saved;
             _settingsWindow = new SettingsWindow(_settingsViewModel)
             {
@@ -241,7 +284,39 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        DragDrop.DoDragDrop((DependencyObject)sender, _draggedPin, DragDropEffects.Move);
+        try
+        {
+            DragDrop.DoDragDrop((DependencyObject)sender, _draggedPin, DragDropEffects.Move);
+        }
+        finally
+        {
+            _draggedPin = null;
+        }
+    }
+
+    private void PinnedFolder_DragOver(object sender, DragEventArgs e)
+    {
+        if (sender is not Button targetButton
+            || targetButton.DataContext is not NavigationFolder target
+            || e.Data.GetData(typeof(NavigationFolder)) is not NavigationFolder source
+            || source.Id == target.Id)
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        var placeAfterTarget = e.GetPosition(targetButton).X >= targetButton.ActualWidth / 2;
+        targetButton.BorderBrush = FindResource("RouteBlueBrush") as System.Windows.Media.Brush;
+        targetButton.BorderThickness = placeAfterTarget
+            ? new Thickness(1, 1, 3, 1)
+            : new Thickness(3, 1, 1, 1);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private static void PinnedFolder_DragLeave(object sender, DragEventArgs e)
+    {
+        ResetPinnedFolderDropIndicator(sender as Button);
     }
 
     private void PinnedFolder_Drop(object sender, DragEventArgs e)
@@ -253,14 +328,127 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var targetIndex = _viewModel.Explorer.PinnedFolders
-            .Select((folder, index) => (folder, index))
-            .FirstOrDefault(item => item.folder.Id == target.Id)
-            .index;
+        var targetButton = sender as Button;
+        var placeAfterTarget = targetButton is not null
+            && e.GetPosition(targetButton).X >= targetButton.ActualWidth / 2;
+        ResetPinnedFolderDropIndicator(targetButton);
         _viewModel.Explorer.ReorderPinnedFolderCommand.Execute(
-            new PinMoveRequest(source.Id, targetIndex));
+            new PinMoveRequest(source.Id, target.Id, placeAfterTarget));
         _draggedPin = null;
         e.Handled = true;
+    }
+
+    private static void ResetPinnedFolderDropIndicator(Button? button)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        button.ClearValue(Border.BorderBrushProperty);
+        button.ClearValue(Border.BorderThicknessProperty);
+    }
+
+    private void Rule_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _ruleDragStart = e.GetPosition(this);
+        _draggedRule = (sender as FrameworkElement)?.DataContext as FolderRule;
+    }
+
+    private void Rule_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _draggedRule is null)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        if (Math.Abs(current.X - _ruleDragStart.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(current.Y - _ruleDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        try
+        {
+            DragDrop.DoDragDrop((DependencyObject)sender, _draggedRule, DragDropEffects.Move);
+        }
+        finally
+        {
+            _draggedRule = null;
+        }
+    }
+
+    private void Folder_DragOver(object sender, DragEventArgs e)
+    {
+        if (sender is not Button targetButton
+            || targetButton.DataContext is not NavigationFolderNodeViewModel target
+            || e.Data.GetData(typeof(FolderRule)) is not FolderRule rule
+            || rule.NavigationFolderId == target.Id)
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        targetButton.Background = FindResource("SoftBlueBrush") as System.Windows.Media.Brush;
+        targetButton.BorderBrush = FindResource("RouteBlueBrush") as System.Windows.Media.Brush;
+        targetButton.BorderThickness = new Thickness(2);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private static void Folder_DragLeave(object sender, DragEventArgs e) =>
+        ResetFolderDropIndicator(sender as Button);
+
+    private void Folder_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(typeof(FolderRule)) is not FolderRule rule
+            || (sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel target)
+        {
+            return;
+        }
+
+        ResetFolderDropIndicator(sender as Button);
+        _viewModel.Explorer.MoveRuleCommand.Execute(new RuleMoveRequest(rule.Id, target.Id));
+        _draggedRule = null;
+        e.Handled = true;
+    }
+
+    private static void ResetFolderDropIndicator(Button? button)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        button.ClearValue(Button.BackgroundProperty);
+        button.ClearValue(Border.BorderBrushProperty);
+        button.ClearValue(Border.BorderThicknessProperty);
+    }
+
+    private async void Sidebar_NewFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var currentFolder = _viewModel.Explorer.CurrentFolder;
+        var dialog = new FolderEditorDialog(
+            "新建子文件夹",
+            $"将创建在“{currentFolder.Name}”中",
+            "创建")
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            await _viewModel.Explorer.CreateFolderAsync(
+                currentFolder.Id,
+                dialog.FolderName);
+        }
+    }
+
+    private void CurrentFolder_NewRule_Click(object sender, RoutedEventArgs e)
+    {
+        var targetFolderId = _viewModel.Explorer.CurrentFolder.Id;
+        ShowSettings();
+        _settingsViewModel?.Organizer.SelectFolder(targetFolderId);
     }
 
     private async void Folder_NewChild_Click(object sender, RoutedEventArgs e)
@@ -270,12 +458,16 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var name = Microsoft.VisualBasic.Interaction.InputBox(
-            "输入子文件夹名称：",
-            "新建子文件夹");
-        if (!string.IsNullOrWhiteSpace(name))
+        var dialog = new FolderEditorDialog(
+            "新建子文件夹",
+            $"将创建在“{node.Name}”中",
+            "创建")
         {
-            await _viewModel.Explorer.CreateFolderAsync(node.Id, name);
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            await _viewModel.Explorer.CreateFolderAsync(node.Id, dialog.FolderName);
         }
     }
 
@@ -286,13 +478,18 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        var name = Microsoft.VisualBasic.Interaction.InputBox(
-            "输入新名称：",
+        var dialog = new FolderEditorDialog(
             "重命名文件夹",
-            node.Name);
-        if (!string.IsNullOrWhiteSpace(name))
+            "修改后，内部的子文件夹和快捷方式不会改变",
+            "保存",
+            node.Name)
         {
-            await _viewModel.Explorer.RenameFolderAsync(node.Id, name);
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true
+            && !string.Equals(dialog.FolderName, node.Name, StringComparison.Ordinal))
+        {
+            await _viewModel.Explorer.RenameFolderAsync(node.Id, dialog.FolderName);
         }
     }
 

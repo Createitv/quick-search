@@ -7,4 +7,8 @@ public sealed record AppSettings
     public string GlobalShortcut { get; init; } = "Ctrl+Alt+F";
 
     public bool StartWithWindows { get; init; } = true;
+
+    public bool AutomaticallyCheckForUpdates { get; init; } = true;
+
+    public DateTimeOffset? LastUpdateCheckAtUtc { get; init; }
 }

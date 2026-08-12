@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using System.Windows.Interop;
 using QuickSearch.Core;
 
@@ -9,6 +10,7 @@ public partial class App : System.Windows.Application
     private ISingleInstanceService? _singleInstance;
     private MainWindow? _mainWindow;
     private TrayIconController? _trayController;
+    private HttpClient? _updateHttpClient;
 
     protected override async void OnStartup(System.Windows.StartupEventArgs e)
     {
@@ -25,6 +27,9 @@ public partial class App : System.Windows.Application
         _singleInstance = serviceResult.Value;
         var backgroundRequested = e.Args.Contains(
             "--background",
+            StringComparer.OrdinalIgnoreCase);
+        var updatedRequested = e.Args.Contains(
+            "--updated",
             StringComparer.OrdinalIgnoreCase);
         var disposition = AppLaunchDecision.Decide(
             _singleInstance.IsPrimary,
@@ -52,6 +57,23 @@ public partial class App : System.Windows.Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "QuickSearch");
         var store = new JsonMappingStore(Path.Combine(configDirectory, "config.json"));
+        _updateHttpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(5)
+        };
+        var updateService = new GitHubReleaseUpdateService(
+            _updateHttpClient,
+            "Createitv",
+            "quick-search",
+            Path.Combine(configDirectory, "updates"),
+            new WindowsInstallerLauncher());
+        var installedVersion = Assembly.GetEntryAssembly()?.GetName().Version;
+        var update = new ApplicationUpdateViewModel(
+            updateService,
+            installedVersion is null
+                ? "0.0.2"
+                : $"{installedVersion.Major}.{installedVersion.Minor}.{Math.Max(installedVersion.Build, 0)}");
+        update.ShutdownRequested += Update_ShutdownRequested;
         var native = new EverythingNativeAdapter();
         var search = new EverythingFolderSearch(native);
         var bootstrap = new EverythingBootstrapViewModel(
@@ -67,10 +89,16 @@ public partial class App : System.Windows.Application
             store,
             search,
             startup,
-            bootstrap);
+            bootstrap,
+            update);
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();
+        if (updatedRequested)
+        {
+            _mainWindow.ReportStatus("QuickSearch 已更新完成。");
+        }
+        _ = _mainWindow.CheckForUpdatesOnStartupAsync();
         await bootstrap.InitializeAsync();
 
         var activationController = new SingleInstanceActivationController(_singleInstance);
@@ -87,6 +115,10 @@ public partial class App : System.Windows.Application
         {
             _mainWindow.ShowLauncher();
         }
+        else if (updatedRequested)
+        {
+            _mainWindow.ShowLauncher();
+        }
         else if (!backgroundRequested)
         {
             await _mainWindow.ActivateFromClipboardAsync();
@@ -96,10 +128,14 @@ public partial class App : System.Windows.Application
     protected override void OnExit(System.Windows.ExitEventArgs e)
     {
         _trayController?.Dispose();
+        _updateHttpClient?.Dispose();
         _mainWindow?.Dispose();
         _singleInstance?.Dispose();
         base.OnExit(e);
     }
+
+    private void Update_ShutdownRequested(object? sender, EventArgs e) =>
+        Dispatcher.BeginInvoke(Shutdown);
 
     private void InitializeTray()
     {

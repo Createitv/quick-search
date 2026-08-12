@@ -14,9 +14,11 @@
     <PlatformTarget>x64</PlatformTarget>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>Assets\QuickSearch.ico</ApplicationIcon>
+    <Version>0.0.2</Version>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\QuickSearch.Core\QuickSearch.Core.csproj" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Assets\QuickSearch.ico" />

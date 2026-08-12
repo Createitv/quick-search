@@ -12,6 +12,7 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly IFolderSearch _search;
     private string _shortcut = string.Empty;
     private bool _startWithWindows;
+    private bool _automaticallyCheckForUpdates;
     private string _everythingHealthText = string.Empty;
     private EverythingHealth _everythingHealth;
     private string _message = string.Empty;
@@ -26,7 +27,8 @@ public sealed class SettingsViewModel : ObservableObject
         IMappingStore store,
         IHotkeyRegistration hotkey,
         IStartupRegistration startup,
-        IFolderSearch search)
+        IFolderSearch search,
+        ApplicationUpdateViewModel? update = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(store);
@@ -38,6 +40,7 @@ public sealed class SettingsViewModel : ObservableObject
         _hotkey = hotkey;
         _startup = startup;
         _search = search;
+        Update = update;
         Organizer = new NavigationOrganizerViewModel(configuration);
 
         AddMappingCommand = new RelayCommand(AddMapping);
@@ -61,6 +64,8 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<MappingGroupEditorViewModel> Mappings => MappingGroups;
 
     public NavigationOrganizerViewModel Organizer { get; }
+
+    public ApplicationUpdateViewModel? Update { get; }
 
     public IReadOnlyList<MappingGroupEditorViewModel> FilteredMappingGroups
     {
@@ -99,6 +104,12 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _startWithWindows;
         set => SetProperty(ref _startWithWindows, value);
+    }
+
+    public bool AutomaticallyCheckForUpdates
+    {
+        get => _automaticallyCheckForUpdates;
+        set => SetProperty(ref _automaticallyCheckForUpdates, value);
     }
 
     public string EverythingHealthText
@@ -162,6 +173,8 @@ public sealed class SettingsViewModel : ObservableObject
     {
         Shortcut = _configuration.Settings.GlobalShortcut;
         StartWithWindows = _configuration.Settings.StartWithWindows;
+        AutomaticallyCheckForUpdates =
+            _configuration.Settings.AutomaticallyCheckForUpdates;
         Organizer.BeginEdit(_configuration);
         foreach (var group in MappingGroups)
         {
@@ -331,7 +344,8 @@ public sealed class SettingsViewModel : ObservableObject
         candidate.Settings = candidate.Settings with
         {
             GlobalShortcut = shortcut,
-            StartWithWindows = StartWithWindows
+            StartWithWindows = StartWithWindows,
+            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates
         };
 
         if (!_mappingGroupsDirty)

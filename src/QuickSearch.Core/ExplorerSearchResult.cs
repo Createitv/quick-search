@@ -24,6 +24,11 @@ public sealed class ExplorerStatusEventArgs(
     public StatusKind Kind { get; } = kind;
 }
 
-public sealed record PinMoveRequest(Guid FolderId, int TargetIndex);
+public sealed record PinMoveRequest(
+    Guid FolderId,
+    Guid TargetFolderId,
+    bool PlaceAfterTarget);
+
+public sealed record RuleMoveRequest(Guid RuleId, Guid TargetFolderId);
 
 public sealed record FolderNameRequest(Guid? ParentId, Guid? FolderId, string Name);

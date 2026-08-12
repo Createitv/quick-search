@@ -39,7 +39,12 @@ public sealed class RuleExplorerViewModel : ObservableObject
         UnpinFolderCommand = new AsyncRelayCommand<NavigationFolder>(folder =>
             UnpinFolderAsync(folder.Id));
         ReorderPinnedFolderCommand = new AsyncRelayCommand<PinMoveRequest>(request =>
-            ReorderPinnedFolderAsync(request.FolderId, request.TargetIndex));
+            ReorderPinnedFolderRelativeAsync(
+                request.FolderId,
+                request.TargetFolderId,
+                request.PlaceAfterTarget));
+        MoveRuleCommand = new AsyncRelayCommand<RuleMoveRequest>(request =>
+            MoveRuleAsync(request.RuleId, request.TargetFolderId));
         CreateFolderCommand = new AsyncRelayCommand<FolderNameRequest>(request =>
             CreateFolderAsync(request.ParentId, request.Name));
         RenameFolderCommand = new AsyncRelayCommand<FolderNameRequest>(request =>
@@ -139,6 +144,8 @@ public sealed class RuleExplorerViewModel : ObservableObject
 
     public AsyncRelayCommand<PinMoveRequest> ReorderPinnedFolderCommand { get; }
 
+    public AsyncRelayCommand<RuleMoveRequest> MoveRuleCommand { get; }
+
     public AsyncRelayCommand<FolderNameRequest> CreateFolderCommand { get; }
 
     public AsyncRelayCommand<FolderNameRequest> RenameFolderCommand { get; }
@@ -162,7 +169,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
             OnPropertyChanged(nameof(IsSearching));
         }
 
-        RefreshVisibleContent();
+        RefreshFromConfiguration();
     }
 
     public async Task PinFolderAsync(Guid folderId) =>
@@ -182,6 +189,40 @@ public sealed class RuleExplorerViewModel : ObservableObject
             candidate => candidate.ReorderPinnedFolder(folderId, targetIndex),
             "收藏顺序已保存。",
             "无法保存收藏顺序");
+
+    public async Task ReorderPinnedFolderRelativeAsync(
+        Guid folderId,
+        Guid targetFolderId,
+        bool placeAfterTarget) =>
+        await ApplyImmediateAsync(
+            candidate => candidate.ReorderPinnedFolderRelative(
+                folderId,
+                targetFolderId,
+                placeAfterTarget),
+            "收藏顺序已保存。",
+            "无法保存收藏顺序");
+
+    public async Task MoveRuleAsync(Guid ruleId, Guid targetFolderId)
+    {
+        if (_configuration.Rules.FirstOrDefault(rule => rule.Id == ruleId) is not { } rule
+            || _configuration.NavigationFolders.FirstOrDefault(folder =>
+                folder.Id == targetFolderId) is not { } targetFolder)
+        {
+            Report("快捷方式或目标文件夹不存在。", StatusKind.Error);
+            return;
+        }
+
+        if (rule.NavigationFolderId == targetFolderId)
+        {
+            Report($"“{rule.DisplayTitle}”已经在“{targetFolder.Name}”中。", StatusKind.Neutral);
+            return;
+        }
+
+        await ApplyImmediateAsync(
+            candidate => candidate.MoveRule(ruleId, targetFolderId),
+            $"已将“{rule.DisplayTitle}”移动到“{targetFolder.Name}”。",
+            "无法移动快捷方式");
+    }
 
     public async Task<NavigationFolder> CreateFolderAsync(Guid? parentId, string name)
     {
@@ -250,11 +291,14 @@ public sealed class RuleExplorerViewModel : ObservableObject
             _currentFolderId = _configuration.UncategorizedFolderId;
         }
 
+        var currentPathIds = BuildFolderPath(_currentFolderId)
+            .Select(folder => folder.Id)
+            .ToHashSet();
         RootFolders = _configuration.NavigationFolders
             .Where(folder => folder.ParentId is null)
             .OrderBy(folder => folder.SortOrder)
             .ThenBy(folder => folder.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(BuildNode)
+            .Select(folder => BuildNode(folder, currentPathIds))
             .ToArray();
         PinnedFolders = _configuration.PinnedFolderIds
             .Select(folderId => _configuration.NavigationFolders.FirstOrDefault(folder =>
@@ -266,15 +310,25 @@ public sealed class RuleExplorerViewModel : ObservableObject
         RefreshVisibleContent();
     }
 
-    private NavigationFolderNodeViewModel BuildNode(NavigationFolder folder) => new(
-        folder,
-        _configuration.NavigationFolders
-            .Where(candidate => candidate.ParentId == folder.Id)
-            .OrderBy(candidate => candidate.SortOrder)
-            .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(BuildNode)
-            .ToArray(),
-        _configuration.PinnedFolderIds.Contains(folder.Id));
+    private NavigationFolderNodeViewModel BuildNode(
+        NavigationFolder folder,
+        IReadOnlySet<Guid> currentPathIds)
+    {
+        var node = new NavigationFolderNodeViewModel(
+            folder,
+            _configuration.NavigationFolders
+                .Where(candidate => candidate.ParentId == folder.Id)
+                .OrderBy(candidate => candidate.SortOrder)
+                .ThenBy(candidate => candidate.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(child => BuildNode(child, currentPathIds))
+                .ToArray(),
+            _configuration.PinnedFolderIds.Contains(folder.Id))
+        {
+            IsSelected = folder.Id == _currentFolderId,
+            IsExpanded = currentPathIds.Contains(folder.Id)
+        };
+        return node;
+    }
 
     private void RefreshVisibleContent()
     {

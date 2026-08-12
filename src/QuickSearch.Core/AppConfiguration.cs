@@ -235,6 +235,28 @@ public sealed class AppConfiguration
     public bool RemoveRule(Guid ruleId) =>
         _rules.RemoveAll(rule => rule.Id == ruleId) > 0;
 
+    public FolderRule MoveRule(Guid ruleId, Guid targetFolderId)
+    {
+        ValidateFolderExists(targetFolderId);
+        var index = GetRuleIndex(ruleId);
+        var existing = _rules[index];
+        if (existing.NavigationFolderId == targetFolderId)
+        {
+            return existing;
+        }
+
+        var sourceFolderId = existing.NavigationFolderId;
+        var moved = existing with
+        {
+            NavigationFolderId = targetFolderId,
+            SortOrder = GetNextRuleSortOrder(targetFolderId),
+            UpdatedAtUtc = UtcNow()
+        };
+        _rules[index] = moved;
+        NormalizeRuleOrder(sourceFolderId);
+        return moved;
+    }
+
     public void PinFolder(Guid folderId)
     {
         ValidateFolderExists(folderId);
@@ -257,6 +279,30 @@ public sealed class AppConfiguration
         _pinnedFolderIds.RemoveAt(sourceIndex);
         _pinnedFolderIds.Insert(
             Math.Clamp(targetIndex, 0, _pinnedFolderIds.Count),
+            folderId);
+    }
+
+    public void ReorderPinnedFolderRelative(
+        Guid folderId,
+        Guid targetFolderId,
+        bool placeAfterTarget)
+    {
+        var sourceIndex = _pinnedFolderIds.IndexOf(folderId);
+        var targetIndex = _pinnedFolderIds.IndexOf(targetFolderId);
+        if (sourceIndex < 0 || targetIndex < 0)
+        {
+            throw new InvalidOperationException("只能排序已收藏的文件夹。");
+        }
+
+        if (folderId == targetFolderId)
+        {
+            return;
+        }
+
+        _pinnedFolderIds.RemoveAt(sourceIndex);
+        targetIndex = _pinnedFolderIds.IndexOf(targetFolderId);
+        _pinnedFolderIds.Insert(
+            placeAfterTarget ? targetIndex + 1 : targetIndex,
             folderId);
     }
 
@@ -655,6 +701,20 @@ public sealed class AppConfiguration
         {
             var index = GetFolderIndex(siblings[order].Id);
             _navigationFolders[index] = _navigationFolders[index] with { SortOrder = order };
+        }
+    }
+
+    private void NormalizeRuleOrder(Guid folderId)
+    {
+        var rules = _rules
+            .Where(rule => rule.NavigationFolderId == folderId)
+            .OrderBy(rule => rule.SortOrder)
+            .ThenBy(rule => rule.DisplayTitle, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        for (var order = 0; order < rules.Length; order++)
+        {
+            var index = GetRuleIndex(rules[order].Id);
+            _rules[index] = _rules[index] with { SortOrder = order };
         }
     }
 

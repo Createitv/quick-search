@@ -44,7 +44,9 @@ jobs:
             throw "Invalid version tag: $tag"
           }
           "tag=$tag" >> $env:GITHUB_OUTPUT
-          "number=$($tag.TrimStart('v'))" >> $env:GITHUB_OUTPUT
+          $number = $tag.TrimStart('v')
+          "number=$number" >> $env:GITHUB_OUTPUT
+          "assembly_number=$($number.Split('-')[0])" >> $env:GITHUB_OUTPUT
 
       - name: Download official Everything x64 SDK DLL
         shell: pwsh
@@ -72,10 +74,10 @@ jobs:
         run: dotnet restore QuickSearch.sln
 
       - name: Test
-        run: dotnet test QuickSearch.sln -c Release --no-restore --verbosity minimal
+        run: dotnet test QuickSearch.sln -c Release --no-restore --verbosity minimal /p:Version=${{ steps.version.outputs.number }}
 
       - name: Publish self-contained win-x64 app
-        run: dotnet publish src/QuickSearch.Windows/QuickSearch.Windows.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish
+        run: dotnet publish src/QuickSearch.Windows/QuickSearch.Windows.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish /p:Version=${{ steps.version.outputs.number }} /p:FileVersion=${{ steps.version.outputs.assembly_number }} /p:AssemblyVersion=${{ steps.version.outputs.assembly_number }}
 
       - name: Verify published Windows app files
         shell: pwsh
@@ -89,6 +91,10 @@ jobs:
           )
           foreach ($path in $required) {
             if (-not (Test-Path $path)) { throw "Missing publish output: $path" }
+          }
+          $publishedVersion = (Get-Item 'artifacts/publish/QuickSearch.exe').VersionInfo.ProductVersion
+          if (-not $publishedVersion.StartsWith('${{ steps.version.outputs.number }}')) {
+            throw "Published app version mismatch: $publishedVersion"
           }
 
       - name: Run configuration smoke test
@@ -105,10 +111,20 @@ jobs:
           & $iscc "/DAppVersion=${{ steps.version.outputs.number }}" "/DPublishDir=$publish" "/DOutputDir=$output" packaging/QuickSearch.iss
           if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
+      - name: Create installer checksum
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem artifacts/installer/QuickSearch-Setup-v${{ steps.version.outputs.number }}.exe | Select-Object -First 1
+          if (-not $installer) { throw 'Installer was not created' }
+          $hash = (Get-FileHash $installer.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          Set-Content "$($installer.FullName).sha256" $hash -NoNewline
+
       - uses: actions/upload-artifact@v4
         with:
           name: QuickSearch-${{ steps.version.outputs.tag }}-win-x64
-          path: artifacts/installer/*.exe
+          path: |
+            artifacts/installer/*.exe
+            artifacts/installer/*.sha256
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -119,8 +135,9 @@ jobs:
         run: |
           $tag = '${{ steps.version.outputs.tag }}'
           $installer = Get-ChildItem artifacts/installer/*.exe | Select-Object -First 1
+          $checksum = Get-Item "$($installer.FullName).sha256"
           if (gh release view $tag 2>$null) {
-            gh release upload $tag $installer.FullName --clobber
+            gh release upload $tag $installer.FullName $checksum.FullName --clobber
           } else {
-            gh release create $tag $installer.FullName --target '${{ github.sha }}' --title "QuickSearch $tag" --generate-notes
+            gh release create $tag $installer.FullName $checksum.FullName --target '${{ github.sha }}' --title "QuickSearch $tag" --generate-notes
           }

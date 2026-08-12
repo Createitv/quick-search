@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="设置" Icon="Assets/QuickSearch.ico" Width="920" Height="700"
         MinWidth="760" MinHeight="580" WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False" Closing="Window_Closing">
@@ -38,6 +39,43 @@
             <TextBox Width="300" HorizontalAlignment="Left" Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Margin="2,6,0,20" Text="复制关键词后按此快捷键，可直接打开所有匹配规则。" Style="{StaticResource SecondaryTextStyle}" />
             <CheckBox Content="登录 Windows 后自动启动" IsChecked="{Binding StartWithWindows}" />
+
+            <TextBlock Margin="0,28,0,0" Text="应用更新" Style="{StaticResource SectionTitleStyle}" />
+            <Border Margin="0,10,0,0" Style="{StaticResource SurfaceCardStyle}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="42" Height="42" Margin="0,0,14,0" CornerRadius="12"
+                        Background="{DynamicResource SoftBlueBrush}">
+                  <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="21"
+                                 Foreground="{DynamicResource RouteBlueBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                  <TextBlock FontWeight="SemiBold">
+                    <Run Text="当前版本 " /><Run Text="{Binding Update.InstalledVersion}" />
+                    <Run Text=" · 最新版本 " /><Run Text="{Binding Update.LatestVersion}" />
+                  </TextBlock>
+                  <TextBlock Margin="0,4,0,0" Text="{Binding Update.StatusText}"
+                             Style="{StaticResource SecondaryTextStyle}" />
+                  <CheckBox Margin="0,12,0,0" Content="启动时自动检查更新（最多每天一次）"
+                            IsChecked="{Binding AutomaticallyCheckForUpdates}" />
+                  <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
+                               Value="{Binding Update.DownloadProgress}" />
+                </StackPanel>
+                <StackPanel Grid.Column="2" Margin="18,0,0,0" Orientation="Horizontal"
+                            VerticalAlignment="Top">
+                  <Button Content="立即检查" Style="{StaticResource QuietButtonStyle}"
+                          Command="{Binding Update.CheckNowCommand}" />
+                  <Button Margin="8,0,0,0" Content="下载并安装"
+                          Style="{StaticResource PrimaryButtonStyle}"
+                          IsEnabled="{Binding Update.CanDownloadAndInstall}"
+                          Click="DownloadAndInstall_Click" />
+                </StackPanel>
+              </Grid>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -51,17 +89,18 @@
               <TextBlock Text="分类文件夹" Style="{StaticResource SectionTitleStyle}" Margin="4,2,0,10" />
               <TreeView Grid.Row="1" ItemsSource="{Binding Organizer.RootFolders}" BorderThickness="0" Background="Transparent"
                         ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}" />
-              <Grid Grid.Row="2" Margin="0,12,0,0">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                <TextBox MinHeight="36" Padding="9,6" Text="{Binding Organizer.NewFolderName, UpdateSourceTrigger=PropertyChanged}" />
-                <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="新建子级" Command="{Binding Organizer.AddFolderCommand}" />
-              </Grid>
+              <Button Grid.Row="2" Margin="0,12,0,0" Padding="10,7"
+                      HorizontalContentAlignment="Center"
+                      Click="NewFolder_Click">
+                <StackPanel Orientation="Horizontal">
+                  <ui:SymbolIcon Symbol="FolderAdd20" Margin="0,0,7,0" />
+                  <TextBlock Text="新建子文件夹…" />
+                </StackPanel>
+              </Button>
               <StackPanel Grid.Row="3" Margin="0,9,0,0">
-                <Grid>
-                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                  <TextBox MinHeight="36" Padding="9,6" Text="{Binding Organizer.RenameFolderName, UpdateSourceTrigger=PropertyChanged}" />
-                  <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="重命名" Command="{Binding Organizer.RenameFolderCommand}" />
-                </Grid>
+                <Button Padding="10,7" Content="重命名当前文件夹…"
+                        Style="{StaticResource QuietButtonStyle}"
+                        Click="RenameFolder_Click" />
                 <Grid Margin="0,8,0,0">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <ComboBox ItemsSource="{Binding Organizer.Folders}" DisplayMemberPath="Name" SelectedItem="{Binding Organizer.MoveTargetFolder, Mode=TwoWay}" />

@@ -41,6 +41,44 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
+    public void ReorderPinnedFolderRelative_MovesLeftItemAfterDropTarget()
+    {
+        var configuration = new AppConfiguration();
+        var first = configuration.AddNavigationFolder("一", parentId: null);
+        var second = configuration.AddNavigationFolder("二", parentId: null);
+        var third = configuration.AddNavigationFolder("三", parentId: null);
+        configuration.PinFolder(first.Id);
+        configuration.PinFolder(second.Id);
+        configuration.PinFolder(third.Id);
+
+        configuration.ReorderPinnedFolderRelative(
+            first.Id,
+            second.Id,
+            placeAfterTarget: true);
+
+        Assert.Equal([second.Id, first.Id, third.Id], configuration.PinnedFolderIds);
+    }
+
+    [Fact]
+    public void ReorderPinnedFolderRelative_MovesRightItemBeforeDropTarget()
+    {
+        var configuration = new AppConfiguration();
+        var first = configuration.AddNavigationFolder("一", parentId: null);
+        var second = configuration.AddNavigationFolder("二", parentId: null);
+        var third = configuration.AddNavigationFolder("三", parentId: null);
+        configuration.PinFolder(first.Id);
+        configuration.PinFolder(second.Id);
+        configuration.PinFolder(third.Id);
+
+        configuration.ReorderPinnedFolderRelative(
+            third.Id,
+            second.Id,
+            placeAfterTarget: false);
+
+        Assert.Equal([first.Id, third.Id, second.Id], configuration.PinnedFolderIds);
+    }
+
+    [Fact]
     public void AddRule_MergesAliasesForTheSamePhysicalPath()
     {
         var configuration = new AppConfiguration();

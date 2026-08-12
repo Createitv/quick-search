@@ -172,6 +172,58 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task MoveRuleAsync_PersistsNewFolderAndRemovesRuleFromCurrentFolder()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var development = configuration.NavigationFolders.Single(folder =>
+            folder.Name == "开发");
+        var customer = configuration.NavigationFolders.Single(folder =>
+            folder.Name == "客户");
+        configuration.AddRule("客户资料", ["customer"], @"F:\Customers", customer.Id);
+        var rule = configuration.Rules.Single(candidate =>
+            candidate.DisplayTitle == "Quick Search 代码");
+        viewModel.NavigateToFolder(development.Id);
+
+        await viewModel.MoveRuleAsync(rule.Id, customer.Id);
+
+        var movedRule = configuration.Rules.Single(candidate => candidate.Id == rule.Id);
+        Assert.Equal(customer.Id, movedRule.NavigationFolderId);
+        Assert.Equal(1, movedRule.SortOrder);
+        Assert.Empty(viewModel.CurrentRules);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
+    public async Task MoveRuleAsync_WhenSaveFails_RestoresOriginalFolder()
+    {
+        var configuration = CreateConfiguration();
+        var originalFolderId = configuration.Rules.Single().NavigationFolderId;
+        var store = new RecordingMappingStore(configuration)
+        {
+            SaveException = new IOException("disk full")
+        };
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var customer = configuration.NavigationFolders.Single(folder =>
+            folder.Name == "客户");
+        var rule = configuration.Rules.Single();
+
+        await viewModel.MoveRuleAsync(rule.Id, customer.Id);
+
+        Assert.Equal(
+            originalFolderId,
+            configuration.Rules.Single(candidate => candidate.Id == rule.Id).NavigationFolderId);
+        Assert.Empty(store.SavedConfigurations);
+    }
+
+    [Fact]
     public void NavigateFolderCommand_UsesFolderParameterAndRefreshesVisibleContent()
     {
         var configuration = CreateConfiguration();
@@ -187,6 +239,12 @@ public sealed class RuleExplorerViewModelTests
         Assert.All(
             viewModel.CurrentRules,
             rule => Assert.Equal(target.Id, rule.NavigationFolderId));
+        var customerNode = viewModel.RootFolders.Single(node => node.Name == "客户");
+        var creekNode = customerNode.Children.Single(node => node.Name == "小溪");
+        var targetNode = creekNode.Children.Single(node => node.Name == "开发");
+        Assert.True(customerNode.IsExpanded);
+        Assert.True(creekNode.IsExpanded);
+        Assert.True(targetNode.IsSelected);
     }
 
     private static AppConfiguration CreateConfiguration()

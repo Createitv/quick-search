@@ -262,6 +262,13 @@
     <Setter Property="Padding" Value="8,6" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="FontWeight" Value="Normal" />
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding IsSelected}" Value="True">
+        <Setter Property="Background" Value="{DynamicResource SoftBlueBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource RouteBlueBrush}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+      </DataTrigger>
+    </Style.Triggers>
   </Style>
 
   <Style x:Key="ExplorerTreeViewItemStyle" TargetType="TreeViewItem">

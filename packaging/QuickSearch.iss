@@ -22,6 +22,7 @@ SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=commandline
 CloseApplications=force
 RestartApplications=no
 UninstallDisplayName=QuickSearch
@@ -43,9 +44,30 @@ Name: "{autodesktop}\QuickSearch"; Filename: "{app}\QuickSearch.exe"; Tasks: des
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加快捷方式："; Flags: unchecked
 
 [Run]
-Filename: "{app}\QuickSearch.exe"; Description: "启动 QuickSearch"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\QuickSearch.exe"; Description: "启动 QuickSearch"; Flags: nowait postinstall skipifsilent; Check: IsNormalInstall
+Filename: "{app}\QuickSearch.exe"; Parameters: "--updated"; Flags: nowait; Check: IsUpdatedInstall
 
 [Code]
+function IsUpdatedInstall: Boolean;
+var
+  Index: Integer;
+begin
+  Result := False;
+  for Index := 1 to ParamCount do
+  begin
+    if CompareText(ParamStr(Index), '/UPDATED') = 0 then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+end;
+
+function IsNormalInstall: Boolean;
+begin
+  Result := not IsUpdatedInstall;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 begin
   if CurUninstallStep = usUninstall then

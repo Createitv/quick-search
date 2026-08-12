@@ -125,6 +125,7 @@ public sealed class SettingsViewModelTests
         viewModel.HideRequested += (_, _) => hidden++;
         viewModel.Shortcut = "Ctrl+Shift+9";
         viewModel.StartWithWindows = false;
+        viewModel.AutomaticallyCheckForUpdates = false;
         viewModel.Mappings[0].Alias = "changed";
         viewModel.Mappings[0].FolderPath = "/changed";
 
@@ -132,6 +133,7 @@ public sealed class SettingsViewModelTests
 
         Assert.Equal("Ctrl+Alt+F", viewModel.Shortcut);
         Assert.True(viewModel.StartWithWindows);
+        Assert.True(viewModel.AutomaticallyCheckForUpdates);
         var mapping = Assert.Single(viewModel.Mappings);
         Assert.Equal("sales", mapping.Alias);
         Assert.Equal("/sales", mapping.FolderPath);
@@ -334,11 +336,13 @@ public sealed class SettingsViewModelTests
             "hotkey adapter unavailable");
         var viewModel = CreateViewModel(configuration, store, hotkey);
         viewModel.StartWithWindows = false;
+        viewModel.AutomaticallyCheckForUpdates = false;
         viewModel.Mappings[0].FolderPath = "/new-sales";
 
         await viewModel.SaveAsync();
 
         Assert.False(configuration.Settings.StartWithWindows);
+        Assert.False(configuration.Settings.AutomaticallyCheckForUpdates);
         Assert.Equal("/new-sales", configuration.FindMapping("sales")?.FolderPath);
         Assert.Equal(1, store.SaveCalls);
     }
