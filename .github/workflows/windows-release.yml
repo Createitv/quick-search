@@ -76,6 +76,9 @@ jobs:
       - name: Test
         run: dotnet test QuickSearch.sln -c Release --no-restore --verbosity minimal /p:Version=${{ steps.version.outputs.number }}
 
+      - name: Run settings window UI smoke test
+        run: dotnet run --project tools/QuickSearch.UiSmoke/QuickSearch.UiSmoke.csproj -c Release
+
       - name: Publish self-contained win-x64 app
         run: dotnet publish src/QuickSearch.Windows/QuickSearch.Windows.csproj -c Release -r win-x64 --self-contained true -o artifacts/publish /p:Version=${{ steps.version.outputs.number }} /p:FileVersion=${{ steps.version.outputs.assembly_number }} /p:AssemblyVersion=${{ steps.version.outputs.assembly_number }}
 
