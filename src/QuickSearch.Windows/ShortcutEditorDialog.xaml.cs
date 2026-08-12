@@ -16,13 +16,12 @@ public partial class ShortcutEditorDialog : Window
         InitializeComponent();
         if (shortcut is not null)
         {
-            Title = "编辑快捷方式";
-            HeadingText.Text = "编辑快捷方式";
-            DescriptionText.Text = "修改名称、搜索关键词或真实文件夹路径";
+            Title = "编辑快捷导航";
+            HeadingText.Text = "编辑快捷导航";
+            DescriptionText.Text = "修改名称或关联的真实文件夹";
             ConfirmIcon.Symbol = SymbolRegular.Edit20;
             ConfirmText.Text = "保存修改";
-            TitleBox.Text = shortcut.Title;
-            KeywordsBox.Text = string.Join(", ", shortcut.Aliases);
+            TitleBox.Text = shortcut.DisplayTitle;
             PathBox.Text = shortcut.FolderPath;
         }
 
@@ -36,22 +35,15 @@ public partial class ShortcutEditorDialog : Window
 
     public string TargetFolderPath { get; }
 
-    public string ShortcutTitle => TitleBox.Text.Trim();
+    public string NavigationTitle => TitleBox.Text.Trim();
 
     public string FolderPath => PathBox.Text.Trim();
-
-    public IReadOnlyList<string> Keywords => KeywordsBox.Text
-        .Split([',', '，', ';', '；'], StringSplitOptions.RemoveEmptyEntries)
-        .Select(keyword => keyword.Trim())
-        .Where(keyword => keyword.Length > 0)
-        .Distinct(StringComparer.OrdinalIgnoreCase)
-        .ToArray();
 
     private void BrowseFolder_Click(object sender, RoutedEventArgs e)
     {
         using var dialog = new FolderBrowserDialog
         {
-            Description = "选择快捷方式对应的真实文件夹",
+            Description = "选择快捷导航对应的真实文件夹",
             UseDescriptionForTitle = true,
             ShowNewFolderButton = true
         };
@@ -85,16 +77,16 @@ public partial class ShortcutEditorDialog : Window
     private bool Validate()
     {
         if (ConfirmButton is null || ValidationText is null
-            || KeywordsBox is null || PathBox is null)
+            || TitleBox is null || PathBox is null)
         {
             return false;
         }
 
         string message;
         var valid = false;
-        if (Keywords.Count == 0)
+        if (NavigationTitle.Length == 0)
         {
-            message = "至少输入一个搜索关键词。";
+            message = "请输入快捷导航名称。";
         }
         else if (FolderPath.Length == 0)
         {

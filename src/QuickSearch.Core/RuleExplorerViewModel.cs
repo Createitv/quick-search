@@ -208,7 +208,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
             || _configuration.NavigationFolders.FirstOrDefault(folder =>
                 folder.Id == targetFolderId) is not { } targetFolder)
         {
-            Report("快捷方式或目标文件夹不存在。", StatusKind.Error);
+            Report("快捷导航或目标文件夹不存在。", StatusKind.Error);
             return;
         }
 
@@ -221,7 +221,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
         await ApplyImmediateAsync(
             candidate => candidate.MoveRule(ruleId, targetFolderId),
             $"已将“{rule.DisplayTitle}”移动到“{targetFolder.Name}”。",
-            "无法移动快捷方式");
+            "无法移动快捷导航");
     }
 
     public async Task<bool> MoveFolderAsync(Guid folderId, Guid targetParentId)
@@ -270,8 +270,8 @@ public sealed class RuleExplorerViewModel : ObservableObject
 
                 createdRuleId = created.Id;
             },
-            "快捷方式已保存。",
-            "无法创建快捷方式");
+            "快捷导航已保存。",
+            "无法创建快捷导航");
 
         return success
             ? _configuration.Rules.Single(rule => rule.Id == createdRuleId)
@@ -288,7 +288,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
         var existing = _configuration.Rules.FirstOrDefault(rule => rule.Id == ruleId);
         if (existing is null)
         {
-            Report("快捷方式不存在。", StatusKind.Error);
+            Report("快捷导航不存在。", StatusKind.Error);
             return false;
         }
 
@@ -300,8 +300,8 @@ public sealed class RuleExplorerViewModel : ObservableObject
                 aliasValues,
                 folderPath,
                 existing.NavigationFolderId),
-            "快捷方式已更新。",
-            "无法更新快捷方式");
+            "快捷导航已更新。",
+            "无法更新快捷导航");
     }
 
     public async Task<bool> DeleteRuleAsync(Guid ruleId)
@@ -309,14 +309,14 @@ public sealed class RuleExplorerViewModel : ObservableObject
         var existing = _configuration.Rules.FirstOrDefault(rule => rule.Id == ruleId);
         if (existing is null)
         {
-            Report("快捷方式不存在。", StatusKind.Error);
+            Report("快捷导航不存在。", StatusKind.Error);
             return false;
         }
 
         return await ApplyImmediateAsync(
             candidate => candidate.RemoveRule(ruleId),
-            $"已删除快捷方式“{existing.DisplayTitle}”。",
-            "无法删除快捷方式");
+            $"已删除快捷导航“{existing.DisplayTitle}”。",
+            "无法删除快捷导航");
     }
 
     public async Task<NavigationFolder> CreateFolderAsync(Guid? parentId, string name)

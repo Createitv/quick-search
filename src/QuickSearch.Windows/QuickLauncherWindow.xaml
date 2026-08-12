@@ -67,7 +67,7 @@
           <TextBox x:Name="LauncherSearchBox" Grid.Column="1"
                    FontFamily="{DynamicResource DisplayFont}" FontSize="22" FontWeight="Medium"
                    Padding="0" MinHeight="42" BorderThickness="0" Background="Transparent"
-                   AutomationProperties.Name="搜索应用、文件、文件夹和快捷方式"
+                   AutomationProperties.Name="搜索快捷导航、应用、文件和文件夹"
                    Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
           <Border Grid.Column="2" Padding="8,4" CornerRadius="7"
                   Background="{DynamicResource MutedSurfaceBrush}" VerticalAlignment="Center">
@@ -150,14 +150,31 @@
               BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0"
               CornerRadius="0,0,14,14">
         <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
           <TextBlock Text="{Binding StatusText}" FontSize="11.5"
                      Foreground="{DynamicResource SlateBrush}" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" />
-          <Button HorizontalAlignment="Right" Width="34" Height="32" Padding="0"
-                  ToolTip="启动器设置" Style="{StaticResource QuietButtonStyle}"
-                  Click="Settings_Click">
-            <ui:SymbolIcon Symbol="Settings20" FontSize="17" />
-          </Button>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Border Margin="12,0,7,0" Padding="9,4" CornerRadius="7"
+                    Background="{DynamicResource PaperBrush}"
+                    BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+                    AutomationProperties.Name="启动器快捷键">
+              <StackPanel Orientation="Horizontal">
+                <ui:SymbolIcon Margin="0,0,6,0" Symbol="DesktopKeyboard20" FontSize="14"
+                               Foreground="{DynamicResource RouteBlueBrush}" />
+                <TextBlock Text="{Binding LauncherShortcutText}" FontSize="11" FontWeight="SemiBold"
+                           Foreground="{DynamicResource SlateBrush}" />
+              </StackPanel>
+            </Border>
+            <Button Width="34" Height="32" Padding="0"
+                    ToolTip="启动器设置" Style="{StaticResource QuietButtonStyle}"
+                    Click="Settings_Click">
+              <ui:SymbolIcon Symbol="Settings20" FontSize="17" />
+            </Button>
+          </StackPanel>
         </Grid>
       </Border>
     </Grid>

@@ -28,7 +28,7 @@
               DragOver="Folder_DragOver"
               DragLeave="Folder_DragLeave"
               Drop="Folder_Drop"
-              ToolTip="单击打开；可将快捷方式或其他文件夹拖到这里">
+              ToolTip="单击打开；可将快捷导航或其他文件夹拖到这里">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -258,20 +258,20 @@
           </Grid.RowDefinitions>
           <DockPanel Margin="0,4,0,10">
             <Button DockPanel.Dock="Right" Padding="10,5"
-                    AutomationProperties.Name="在当前文件夹中新建快捷方式"
+                    AutomationProperties.Name="在当前文件夹中新建快捷导航"
                     Style="{StaticResource QuietButtonStyle}"
                     Click="CurrentFolder_NewRule_Click">
               <StackPanel Orientation="Horizontal">
                 <ui:SymbolIcon Margin="0,0,6,0" Symbol="AddCircle20" FontSize="17" />
-                <TextBlock Text="新建快捷方式" />
+                <TextBlock Text="新建快捷导航" />
               </StackPanel>
             </Button>
-            <TextBlock Text="快捷方式" Style="{StaticResource SectionTitleStyle}" />
+            <TextBlock Text="快捷导航" Style="{StaticResource SectionTitleStyle}" />
             <TextBlock Margin="12,1,0,0" Text="拖到左侧文件夹即可整理" Style="{StaticResource SecondaryTextStyle}" />
           </DockPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <Grid>
-              <TextBlock Padding="16,20" Text="当前文件夹还没有快捷方式。点击右上角“新建快捷方式”，或从其他文件夹拖入。"
+              <TextBlock Padding="16,20" Text="当前文件夹还没有快捷导航。点击右上角“新建快捷导航”，或从其他文件夹拖入。"
                          TextWrapping="Wrap">
                 <TextBlock.Style>
                   <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
@@ -354,7 +354,7 @@
             </Button>
             <StackPanel>
               <TextBlock Text="搜索结果" Style="{StaticResource SectionTitleStyle}" />
-              <TextBlock Margin="0,3,0,0" Text="优先匹配本地分类、规则名称、关键词和路径" Style="{StaticResource SecondaryTextStyle}" />
+              <TextBlock Margin="0,3,0,0" Text="优先匹配本地分类和快捷导航名称" Style="{StaticResource SecondaryTextStyle}" />
             </StackPanel>
           </DockPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
@@ -568,7 +568,7 @@
                 <TextBox Margin="0,7,0,0"
                          AutomationProperties.Name="剪贴板快速打开快捷键"
                          Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Margin="2,6,0,0" Text="复制关键词后使用，直接打开匹配的文件夹。"
+                <TextBlock Margin="2,6,0,0" Text="复制快捷导航名称后使用，直接打开关联的文件夹。"
                            TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
               </StackPanel>
               <StackPanel Grid.Column="2">
@@ -582,7 +582,7 @@
                           Command="{Binding OpenQuickLauncherCommand}">
                     <TextBlock Text="试一下" Foreground="{DynamicResource RouteBlueBrush}" />
                   </Button>
-                  <TextBlock Text="默认 Alt+K，随时搜索应用、文件和快捷方式。"
+                  <TextBlock Text="默认 Alt+K，随时搜索快捷导航、应用和文件。"
                              TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
                 </DockPanel>
               </StackPanel>
@@ -672,11 +672,127 @@
       </Border>
     </Grid>
 
-    <Border Grid.Row="2" Padding="18,0" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Background="{DynamicResource MutedSurfaceBrush}">
+    <Grid x:Name="OnboardingPage" Grid.Row="1" Visibility="Collapsed"
+          Background="{DynamicResource FogBrush}"
+          AutomationProperties.Name="首次使用教程">
+      <Grid Margin="44,30">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+          <StackPanel>
+            <TextBlock Text="欢迎使用 QuickSearch" Style="{StaticResource WindowTitleStyle}" />
+            <TextBlock Margin="0,5,0,0" Text="用 4 个步骤建立自己的文件夹快速入口"
+                       Style="{StaticResource SecondaryTextStyle}" />
+          </StackPanel>
+          <Button HorizontalAlignment="Right" VerticalAlignment="Top"
+                  Padding="12,7" Style="{StaticResource QuietButtonStyle}"
+                  Command="{Binding SkipCommand}">
+            <TextBlock Text="跳过教程" />
+          </Button>
+        </Grid>
+
+        <Border Grid.Row="1" Width="720" MaxWidth="720" Margin="0,26,0,20"
+                HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                Style="{StaticResource SurfaceCardStyle}" Padding="0">
+          <Grid>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="6" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressValue}"
+                         Height="6" BorderThickness="0" Background="{DynamicResource SoftBlueBrush}"
+                         Foreground="{DynamicResource RouteBlueBrush}" />
+            <Grid Grid.Row="1" Margin="46,34">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+              </Grid.RowDefinitions>
+              <Grid>
+                <Border Width="58" Height="58" HorizontalAlignment="Left" CornerRadius="16"
+                        Background="{DynamicResource SoftBlueBrush}">
+                  <ui:SymbolIcon FontSize="28" Foreground="{DynamicResource RouteBlueBrush}">
+                    <ui:SymbolIcon.Style>
+                      <Style TargetType="ui:SymbolIcon">
+                        <Setter Property="Symbol" Value="FolderAdd24" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding CurrentStepIndex}" Value="1">
+                            <Setter Property="Symbol" Value="DesktopKeyboard24" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding CurrentStepIndex}" Value="2">
+                            <Setter Property="Symbol" Value="Search24" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding CurrentStepIndex}" Value="3">
+                            <Setter Property="Symbol" Value="FolderOpen24" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </ui:SymbolIcon.Style>
+                  </ui:SymbolIcon>
+                </Border>
+                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top">
+                  <TextBlock Text="{Binding CurrentStep.Label}" HorizontalAlignment="Right"
+                             FontSize="12" FontWeight="SemiBold"
+                             Foreground="{DynamicResource RouteBlueBrush}" />
+                  <TextBlock Margin="0,4,0,0" Text="{Binding ProgressText}" HorizontalAlignment="Right"
+                             Style="{StaticResource SecondaryTextStyle}" />
+                </StackPanel>
+              </Grid>
+
+              <StackPanel Grid.Row="1" Margin="0,34,0,22" VerticalAlignment="Center">
+                <TextBlock Text="{Binding CurrentStep.Title}" TextWrapping="Wrap"
+                           FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock Margin="0,15,0,0" Text="{Binding CurrentStep.Description}"
+                           TextWrapping="Wrap" FontSize="16" LineHeight="26"
+                           Foreground="{DynamicResource SlateBrush}" />
+                <Border Margin="0,22,0,0" Padding="14,11" CornerRadius="10"
+                        Background="{DynamicResource SoftCyanBrush}">
+                  <StackPanel Orientation="Horizontal">
+                    <ui:SymbolIcon Margin="0,1,9,0" Symbol="ChatHelp20" FontSize="18"
+                                   Foreground="{DynamicResource RouteBlueBrush}" />
+                    <TextBlock Text="{Binding CurrentStep.Detail}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource SlateBrush}" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+
+              <TextBlock Grid.Row="2" Text="{Binding Message}" TextWrapping="Wrap"
+                         Foreground="{DynamicResource ErrorBrush}" />
+            </Grid>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="2" Width="720" HorizontalAlignment="Center">
+          <Button Padding="15,8" HorizontalAlignment="Left"
+                  Style="{StaticResource QuietButtonStyle}" Command="{Binding BackCommand}">
+            <StackPanel Orientation="Horizontal">
+              <ui:SymbolIcon Margin="0,0,7,0" Symbol="ChevronLeft20" FontSize="16" />
+              <TextBlock Text="上一步" />
+            </StackPanel>
+          </Button>
+          <Button Padding="18,9" HorizontalAlignment="Right" IsDefault="True"
+                  Style="{StaticResource PrimaryButtonStyle}" Command="{Binding NextCommand}">
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Text="{Binding PrimaryActionText}" Foreground="White" />
+              <ui:SymbolIcon Margin="8,0,0,0" Symbol="ChevronRight20" FontSize="16"
+                             Foreground="White" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </Grid>
+    </Grid>
+
+    <Border x:Name="AppBottomBar" Grid.Row="2" Padding="18,0"
+            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0"
+            Background="{DynamicResource MutedSurfaceBrush}">
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-          <ui:SymbolIcon Margin="0,0,7,0" Symbol="Keyboard20" FontSize="16"
+          <ui:SymbolIcon Margin="0,0,7,0" Symbol="DesktopKeyboard20" FontSize="16"
                          Foreground="{DynamicResource SlateBrush}" />
           <TextBlock Text="Esc 隐藏 · Ctrl+K 页面搜索 · Alt+K 快速启动 · Ctrl+1–9 快速打开"
                      Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />

@@ -2,13 +2,12 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        Title="新建快捷方式" Icon="Assets/QuickSearch.ico"
-        Width="620" SizeToContent="Height" MinHeight="430"
+        Title="新建快捷导航" Icon="Assets/QuickSearch.ico"
+        Width="620" SizeToContent="Height" MinHeight="380"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
         ShowInTaskbar="False">
   <Grid Margin="28,26">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
@@ -23,8 +22,8 @@
                        Foreground="{DynamicResource RouteBlueBrush}" />
       </Border>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock x:Name="HeadingText" Text="新建快捷方式" Style="{StaticResource WindowTitleStyle}" FontSize="22" />
-        <TextBlock x:Name="DescriptionText" Margin="0,3,0,0" Text="保存后可搜索、拖拽整理或通过右键移动"
+        <TextBlock x:Name="HeadingText" Text="新建快捷导航" Style="{StaticResource WindowTitleStyle}" FontSize="22" />
+        <TextBlock x:Name="DescriptionText" Margin="0,3,0,0" Text="为常用文件夹命名，之后输入名称即可打开"
                    Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
     </StackPanel>
@@ -41,22 +40,14 @@
     </Border>
 
     <StackPanel Grid.Row="2">
-      <TextBlock Text="名称（可选）" Style="{StaticResource FieldLabelStyle}" />
+      <TextBlock Text="名称" Style="{StaticResource FieldLabelStyle}" />
       <TextBox x:Name="TitleBox" MaxLength="120" TextChanged="Field_TextChanged"
-               ToolTip="留空时使用真实文件夹名称" />
-      <TextBlock Margin="2,5,0,0" Text="留空时自动显示真实文件夹的名称。"
+               ToolTip="启动器会优先搜索这个名称" />
+      <TextBlock Margin="2,5,0,0" Text="请输入容易记住的名称，启动器会优先搜索它。"
                  Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
     </StackPanel>
 
     <StackPanel Grid.Row="3" Margin="0,18,0,0">
-      <TextBlock Text="搜索关键词" Style="{StaticResource FieldLabelStyle}" />
-      <TextBox x:Name="KeywordsBox" MaxLength="500" TextChanged="Field_TextChanged"
-               ToolTip="多个关键词使用逗号分隔" />
-      <TextBlock Margin="2,5,0,0" Text="至少填写一个；多个关键词用逗号分隔，例如：客户, 合同, ATR。"
-                 Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
-    </StackPanel>
-
-    <StackPanel Grid.Row="4" Margin="0,18,0,0">
       <TextBlock Text="真实文件夹" Style="{StaticResource FieldLabelStyle}" />
       <Grid>
         <Grid.ColumnDefinitions>
@@ -74,7 +65,7 @@
       </Grid>
     </StackPanel>
 
-    <Grid Grid.Row="5" Margin="0,24,0,0">
+    <Grid Grid.Row="4" Margin="0,24,0,0">
       <TextBlock x:Name="ValidationText" MaxWidth="330" TextWrapping="Wrap"
                  Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
       <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
@@ -88,7 +79,7 @@
                 Style="{StaticResource PrimaryButtonStyle}" Click="ConfirmButton_Click">
           <StackPanel Orientation="Horizontal">
             <ui:SymbolIcon x:Name="ConfirmIcon" Margin="0,0,6,0" Symbol="AddCircle20" FontSize="16" />
-            <TextBlock x:Name="ConfirmText" Text="创建快捷方式" Foreground="White" />
+            <TextBlock x:Name="ConfirmText" Text="创建快捷导航" Foreground="White" />
           </StackPanel>
         </Button>
       </StackPanel>

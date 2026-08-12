@@ -147,7 +147,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     }
 
     public string ShortcutInstruction =>
-        $"复制关键词后按 {Configuration.Settings.GlobalShortcut}";
+        $"复制快捷导航名称后按 {Configuration.Settings.GlobalShortcut}";
 
     public string ResolvedPath =>
         _exactMapping?.FolderPath ?? SelectedResult?.FullPath ?? string.Empty;
@@ -261,7 +261,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         if (keyword.Length == 0)
         {
             ClearSearchText();
-            SetStatus("输入关键词，通过 Everything 搜索文件夹。", StatusKind.Neutral);
+            SetStatus("输入快捷导航名称，通过 Everything 搜索文件夹。", StatusKind.Neutral);
             return LauncherActivationDisposition.ShowLauncher;
         }
 
@@ -359,7 +359,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var query = Explorer.SearchText.Trim();
         if (query.Length == 0)
         {
-            SetStatus("请先输入搜索关键词。", StatusKind.Neutral);
+            SetStatus("请先输入快捷导航名称。", StatusKind.Neutral);
             return Task.CompletedTask;
         }
 
@@ -389,7 +389,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            SetStatus("请输入关键词。", StatusKind.Neutral);
+            SetStatus("请输入快捷导航名称。", StatusKind.Neutral);
             return;
         }
 
@@ -561,10 +561,10 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         RefreshAliasState();
     }
 
-    public void ReportStatus(string message)
+    public void ReportStatus(string message, StatusKind kind = StatusKind.Error)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
-        SetStatus(message, StatusKind.Error);
+        SetStatus(message, kind);
     }
 
     public void Dispose()
@@ -590,7 +590,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            SetStatus("请先复制或输入关键词。", StatusKind.Neutral);
+            SetStatus("请先复制或输入快捷导航名称。", StatusKind.Neutral);
             NotifyConfirmStateChanged();
             return;
         }
@@ -609,7 +609,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
         SetStatus(
             mapping is null
-                ? "这个关键词还没有映射，正在搜索匹配的文件夹。"
+                ? "这个快捷导航名称还没有关联文件夹，正在搜索匹配项。"
                 : "保存的文件夹已经不存在，请重新搜索并修复映射。",
             mapping is null ? StatusKind.Neutral : StatusKind.Error);
         if (string.IsNullOrWhiteSpace(FolderQuery))

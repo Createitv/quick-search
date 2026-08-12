@@ -3,7 +3,7 @@ namespace QuickSearch.Core.Tests;
 public sealed class QuickLauncherViewModelTests
 {
     [Fact]
-    public async Task Search_MergesSavedShortcutsBeforeIndexedItemsAndAssignsFirstNineGestures()
+    public async Task Search_LocalNavigationNameMatchSkipsEverything()
     {
         var configuration = new AppConfiguration();
         configuration.AddRule(
@@ -17,21 +17,51 @@ public sealed class QuickLauncherViewModelTests
                 $@"C:\Indexed\project-{index}",
                 QuickLauncherItemKind.Folder))
             .ToArray();
+        var search = new FakeQuickLauncherSearch(indexed);
         var viewModel = new QuickLauncherViewModel(
             configuration,
             new MemoryMappingStore(configuration),
-            new FakeQuickLauncherSearch(indexed),
+            search,
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask);
+
+        viewModel.SearchText = "项目";
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 1);
+
+        Assert.Equal(QuickLauncherItemKind.Shortcut, viewModel.Results[0].Kind);
+        Assert.Equal("Ctrl+1", viewModel.Results[0].ShortcutText);
+        Assert.Equal("项目资料", viewModel.SelectedResult?.Title);
+        Assert.Equal(0, search.CallCount);
+        Assert.Contains("快捷导航", viewModel.StatusText);
+        Assert.Equal("Alt+K 呼出启动器", viewModel.LauncherShortcutText);
+    }
+
+    [Fact]
+    public async Task Search_NoLocalNavigationNameMatchFallsBackToEverything()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddRule(
+            "项目资料",
+            ["project"],
+            @"C:\Work\Projects",
+            configuration.UncategorizedFolderId);
+        var search = new FakeQuickLauncherSearch(
+        [
+            new("project-folder", @"C:\Indexed\project-folder", QuickLauncherItemKind.Folder)
+        ]);
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            search,
             new FakePathOpener(),
             (_, _) => Task.CompletedTask);
 
         viewModel.SearchText = "project";
-        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 11);
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 1);
 
-        Assert.Equal(QuickLauncherItemKind.Shortcut, viewModel.Results[0].Kind);
-        Assert.Equal("Ctrl+1", viewModel.Results[0].ShortcutText);
-        Assert.Equal("Ctrl+9", viewModel.Results[8].ShortcutText);
-        Assert.Equal(string.Empty, viewModel.Results[9].ShortcutText);
-        Assert.Equal("项目资料", viewModel.SelectedResult?.Title);
+        Assert.Equal(1, search.CallCount);
+        Assert.Equal(QuickLauncherItemKind.Folder, viewModel.Results[0].Kind);
+        Assert.Contains("Everything", viewModel.StatusText);
     }
 
     [Fact]
@@ -111,9 +141,15 @@ public sealed class QuickLauncherViewModelTests
     private sealed class FakeQuickLauncherSearch(
         IReadOnlyList<QuickLauncherSearchItem> results) : IQuickLauncherSearch
     {
+        public int CallCount { get; private set; }
+
         public Task<IReadOnlyList<QuickLauncherSearchItem>> SearchLauncherAsync(
             string query,
-            CancellationToken cancellationToken = default) => Task.FromResult(results);
+            CancellationToken cancellationToken = default)
+        {
+            CallCount++;
+            return Task.FromResult(results);
+        }
     }
 
     private sealed class FakePathOpener : IPathOpener

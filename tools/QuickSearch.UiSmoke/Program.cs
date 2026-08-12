@@ -74,8 +74,54 @@ internal static class Program
             application.Dispatcher.Invoke(
                 () => { },
                 DispatcherPriority.Render);
+
+            var windowCountBeforeOnboarding = application.Windows.Count;
+            if (!mainWindow.ShowFirstRunOnboarding(configurationExistedAtStartup: false))
+            {
+                Console.Error.WriteLine("First-run onboarding was not requested for a new configuration.");
+                return 2;
+            }
+
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
+            var onboardingPage = mainWindow.FindName("OnboardingPage")
+                as System.Windows.FrameworkElement;
+            if (onboardingPage is null
+                || onboardingPage.Visibility != System.Windows.Visibility.Visible)
+            {
+                Console.Error.WriteLine("In-window first-run onboarding did not become visible.");
+                return 2;
+            }
+
+            if (application.Windows.Count != windowCountBeforeOnboarding)
+            {
+                Console.Error.WriteLine("Onboarding created an unexpected additional window.");
+                return 2;
+            }
+
+            if (onboardingPage.DataContext is not FirstRunOnboardingViewModel onboarding)
+            {
+                Console.Error.WriteLine("Onboarding did not receive its view model.");
+                return 2;
+            }
+
+            onboarding.NextCommand.Execute(null);
+            onboarding.NextCommand.Execute(null);
+            onboarding.NextCommand.Execute(null);
+            onboarding.NextCommand.Execute(null);
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Background);
+            if (onboardingPage.Visibility != System.Windows.Visibility.Collapsed
+                || store.LastSavedConfiguration?.Settings.HasCompletedOnboarding != true)
+            {
+                Console.Error.WriteLine("Onboarding completion was not saved and dismissed.");
+                return 2;
+            }
+
             mainWindow.ExitApplication();
-            Console.WriteLine("QuickSearch in-window settings smoke check passed.");
+            Console.WriteLine("QuickSearch in-window settings and onboarding smoke checks passed.");
             return 0;
         }
         catch (Exception exception)
@@ -99,12 +145,18 @@ internal static class Program
 
 sealed class MemoryMappingStore(AppConfiguration configuration) : IMappingStore
 {
+    public AppConfiguration? LastSavedConfiguration { get; private set; }
+
     public Task<AppConfiguration> LoadAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(configuration.Clone());
 
     public Task SaveAsync(
         AppConfiguration candidate,
-        CancellationToken cancellationToken = default) => Task.CompletedTask;
+        CancellationToken cancellationToken = default)
+    {
+        LastSavedConfiguration = candidate.Clone();
+        return Task.CompletedTask;
+    }
 }
 
 sealed class SuccessfulStartupRegistration : IStartupRegistration

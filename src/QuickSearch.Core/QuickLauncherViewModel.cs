@@ -12,7 +12,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     private string _searchText = string.Empty;
     private IReadOnlyList<QuickLauncherResult> _results = [];
     private QuickLauncherResult? _selectedResult;
-    private string _statusText = "输入应用、文件夹、文件或快捷方式名称";
+    private string _statusText = "输入快捷导航名称，或搜索应用、文件和文件夹";
     private bool _isSearching;
     private bool _disposed;
 
@@ -82,6 +82,9 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
 
     public bool HasResults => Results.Count > 0;
 
+    public string LauncherShortcutText =>
+        $"{_configuration.Settings.QuickLauncherShortcut} 呼出启动器";
+
     public void Reset()
     {
         CancelSearch();
@@ -90,7 +93,8 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         Results = [];
         SelectedResult = null;
         IsSearching = false;
-        StatusText = "输入应用、文件夹、文件或快捷方式名称";
+        StatusText = "输入快捷导航名称，或搜索应用、文件和文件夹";
+        OnPropertyChanged(nameof(LauncherShortcutText));
     }
 
     public async Task<bool> OpenSelectedAsync()
@@ -174,7 +178,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
             Results = [];
             SelectedResult = null;
             IsSearching = false;
-            StatusText = "输入应用、文件夹、文件或快捷方式名称";
+            StatusText = "输入快捷导航名称，或搜索应用、文件和文件夹";
             return;
         }
 
@@ -192,18 +196,17 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
             await _delayAsync(SearchDebounce, cancellationToken);
 
             var local = BuildLocalResults(query);
-            var indexed = await _search.SearchLauncherAsync(query, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            var paths = new HashSet<string>(
-                local.Select(item => item.FullPath),
-                StringComparer.OrdinalIgnoreCase);
-            var combined = local.Concat(indexed
-                    .Where(item => paths.Add(item.FullPath))
+            var usedEverything = local.Count == 0;
+            var candidates = usedEverything
+                ? (await _search.SearchLauncherAsync(query, cancellationToken))
                     .Select(item => new QuickLauncherResult(
                         item.Name,
                         item.FullPath,
                         GetKindLabel(item.Kind),
-                        item.Kind)))
+                        item.Kind))
+                : local;
+            cancellationToken.ThrowIfCancellationRequested();
+            var combined = candidates
                 .Take(20)
                 .Select((item, index) => item with
                 {
@@ -214,8 +217,10 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
             Results = combined;
             SelectedResult = combined.FirstOrDefault();
             StatusText = combined.Length == 0
-                ? "没有找到匹配项，换一个关键词试试"
-                : $"找到 {combined.Length} 项 · Enter 打开 · Ctrl+1–9 快速打开";
+                ? "快捷导航和 Everything 都没有找到匹配项"
+                : usedEverything
+                    ? $"快捷导航无匹配 · Everything 找到 {combined.Length} 项 · Enter 打开"
+                    : $"找到 {combined.Length} 个快捷导航 · Enter 打开 · Ctrl+1–9 快速打开";
         }
         catch (OperationCanceledException)
         {
@@ -240,7 +245,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         QuickLauncherItemKind.Folder => "文件夹",
         QuickLauncherItemKind.Application => "应用",
         QuickLauncherItemKind.File => "文件",
-        _ => "我的快捷文件夹"
+        _ => "我的快捷导航"
     };
 
     private IReadOnlyList<QuickLauncherResult> BuildLocalResults(string query)
@@ -248,14 +253,13 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         var tokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return _configuration.Rules
             .Where(rule => tokens.All(token =>
-                $"{rule.DisplayTitle} {string.Join(' ', rule.Aliases)} {rule.FolderPath}"
-                    .Contains(token, StringComparison.OrdinalIgnoreCase)))
+                rule.DisplayTitle.Contains(token, StringComparison.OrdinalIgnoreCase)))
             .OrderByDescending(rule => rule.LastUsedAtUtc)
             .ThenBy(rule => rule.DisplayTitle, StringComparer.OrdinalIgnoreCase)
             .Select(rule => new QuickLauncherResult(
                 rule.DisplayTitle,
                 rule.FolderPath,
-                "我的快捷文件夹",
+                "我的快捷导航",
                 QuickLauncherItemKind.Shortcut,
                 rule.Id))
             .ToArray();

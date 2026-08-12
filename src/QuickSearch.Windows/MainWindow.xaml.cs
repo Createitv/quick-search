@@ -29,6 +29,7 @@ public partial class MainWindow : Window, IDisposable
     private GlobalHotkey? _globalLauncherHotkey;
     private string? _hotkeyInitializationFailure;
     private SettingsViewModel? _settingsViewModel;
+    private FirstRunOnboardingViewModel? _onboardingViewModel;
     private readonly QuickLauncherViewModel _quickLauncherViewModel;
     private QuickLauncherWindow? _quickLauncherWindow;
     private Point _pinDragStart;
@@ -37,6 +38,7 @@ public partial class MainWindow : Window, IDisposable
     private FolderRule? _draggedRule;
     private Point _folderDragStart;
     private NavigationFolder? _draggedFolder;
+    private bool _isDismissingOnboarding;
     private bool _allowClose;
 
     public MainWindow(
@@ -181,6 +183,34 @@ public partial class MainWindow : Window, IDisposable
         _quickLauncherWindow.ShowLauncher(hideWhenDeactivated);
     }
 
+    public bool ShowFirstRunOnboarding(bool configurationExistedAtStartup)
+    {
+        if (!FirstRunOnboardingPolicy.ShouldShow(
+                configurationExistedAtStartup,
+                _viewModel.Configuration.Settings.HasCompletedOnboarding))
+        {
+            return false;
+        }
+
+        if (_onboardingViewModel is null)
+        {
+            _onboardingViewModel = new FirstRunOnboardingViewModel(
+                _viewModel.Configuration.Settings.QuickLauncherShortcut);
+            _onboardingViewModel.Completed += Onboarding_DismissRequested;
+            _onboardingViewModel.Skipped += Onboarding_DismissRequested;
+            OnboardingPage.DataContext = _onboardingViewModel;
+        }
+
+        ExplorerPage.Visibility = Visibility.Collapsed;
+        GeneralSettingsPage.Visibility = Visibility.Collapsed;
+        OnboardingPage.Visibility = Visibility.Visible;
+        AppBottomBar.IsEnabled = false;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+        return true;
+    }
+
     public void ReportStatus(string message) => _viewModel.ReportStatus(message);
 
     public void ExitApplication()
@@ -200,6 +230,12 @@ public partial class MainWindow : Window, IDisposable
             _settingsViewModel.Saved -= SettingsViewModel_Saved;
             _settingsViewModel.HideRequested -= SettingsViewModel_HideRequested;
             _settingsViewModel.QuickLauncherRequested -= SettingsViewModel_QuickLauncherRequested;
+        }
+
+        if (_onboardingViewModel is not null)
+        {
+            _onboardingViewModel.Completed -= Onboarding_DismissRequested;
+            _onboardingViewModel.Skipped -= Onboarding_DismissRequested;
         }
 
         if (_quickLauncherWindow is not null)
@@ -375,6 +411,13 @@ public partial class MainWindow : Window, IDisposable
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (OnboardingPage.Visibility == Visibility.Visible && e.Key == Key.Escape)
+        {
+            _onboardingViewModel?.SkipCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
         if (GeneralSettingsPage.Visibility == Visibility.Visible && e.Key == Key.Escape)
         {
             _settingsViewModel?.Cancel();
@@ -658,8 +701,8 @@ public partial class MainWindow : Window, IDisposable
         {
             await _viewModel.Explorer.UpdateRuleAsync(
                 rule.Id,
-                dialog.ShortcutTitle,
-                dialog.Keywords,
+                dialog.NavigationTitle,
+                [dialog.NavigationTitle],
                 dialog.FolderPath);
         }
     }
@@ -672,8 +715,8 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var choice = System.Windows.MessageBox.Show(
-            $"确定删除快捷方式“{rule.DisplayTitle}”吗？\n\n只会删除快捷方式，不会删除真实文件夹。",
-            "删除快捷方式",
+            $"确定删除快捷导航“{rule.DisplayTitle}”吗？\n\n只会删除快捷导航，不会删除真实文件夹。",
+            "删除快捷导航",
             System.Windows.MessageBoxButton.YesNo,
             System.Windows.MessageBoxImage.Warning);
         if (choice == System.Windows.MessageBoxResult.Yes)
@@ -850,8 +893,8 @@ public partial class MainWindow : Window, IDisposable
         {
             await _viewModel.Explorer.CreateRuleAsync(
                 targetFolder.Id,
-                dialog.ShortcutTitle,
-                dialog.Keywords,
+                dialog.NavigationTitle,
+                [dialog.NavigationTitle],
                 dialog.FolderPath);
         }
     }
@@ -885,7 +928,7 @@ public partial class MainWindow : Window, IDisposable
 
         var dialog = new FolderEditorDialog(
             "重命名文件夹",
-            "修改后，内部的子文件夹和快捷方式不会改变",
+            "修改后，内部的子文件夹和快捷导航不会改变",
             "保存",
             node.Name)
         {
@@ -916,8 +959,8 @@ public partial class MainWindow : Window, IDisposable
         }
 
         var choice = System.Windows.MessageBox.Show(
-            "选择“是”：删除当前文件夹，子文件夹和快捷方式上移一层。\n\n"
-            + "选择“否”：删除整棵文件夹树及其中的所有快捷方式。\n\n"
+            "选择“是”：删除当前文件夹，子文件夹和快捷导航上移一层。\n\n"
+            + "选择“否”：删除整棵文件夹树及其中的所有快捷导航。\n\n"
             + "真实磁盘文件夹不会被删除。",
             $"删除“{node.Name}”",
             System.Windows.MessageBoxButton.YesNoCancel,
@@ -971,11 +1014,48 @@ public partial class MainWindow : Window, IDisposable
 
     private void ShowExplorerPage()
     {
+        OnboardingPage.Visibility = Visibility.Collapsed;
         GeneralSettingsPage.Visibility = Visibility.Collapsed;
         ExplorerPage.Visibility = Visibility.Visible;
+        AppBottomBar.IsEnabled = true;
         if (IsVisible)
         {
             FocusSearch();
+        }
+    }
+
+    private async void Onboarding_DismissRequested(object? sender, EventArgs e)
+    {
+        if (_isDismissingOnboarding)
+        {
+            return;
+        }
+
+        _isDismissingOnboarding = true;
+        var candidate = _viewModel.Configuration.Clone();
+        candidate.Settings = candidate.Settings with
+        {
+            HasCompletedOnboarding = true
+        };
+
+        try
+        {
+            await _store.SaveAsync(candidate);
+            _viewModel.Configuration.ReplaceWith(candidate);
+            _viewModel.RefreshConfiguration();
+            _viewModel.ReportStatus(
+                "首次使用教程已完成，可以开始建立快捷导航。",
+                StatusKind.Success);
+            ShowExplorerPage();
+        }
+        catch (Exception exception)
+        {
+            _onboardingViewModel?.ReportSaveFailure(
+                $"无法保存教程状态：{exception.Message}");
+        }
+        finally
+        {
+            _isDismissingOnboarding = false;
         }
     }
 

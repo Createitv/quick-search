@@ -9,6 +9,7 @@ public sealed class AppConfigurationTests
 
         Assert.Equal(3, settings.SchemaVersion);
         Assert.Equal("Alt+K", settings.QuickLauncherShortcut);
+        Assert.False(settings.HasCompletedOnboarding);
     }
 
     [Fact]

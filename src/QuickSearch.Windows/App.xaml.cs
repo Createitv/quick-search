@@ -57,7 +57,9 @@ public partial class App : System.Windows.Application
         var configDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "QuickSearch");
-        var store = new JsonMappingStore(Path.Combine(configDirectory, "config.json"));
+        var configPath = Path.Combine(configDirectory, "config.json");
+        var configurationExistedAtStartup = File.Exists(configPath);
+        var store = new JsonMappingStore(configPath);
         _updateHttpClient = new HttpClient
         {
             Timeout = TimeSpan.FromMinutes(5)
@@ -115,6 +117,11 @@ public partial class App : System.Windows.Application
         }
 
         InitializeTray();
+        if (_mainWindow.ShowFirstRunOnboarding(configurationExistedAtStartup))
+        {
+            return;
+        }
+
         if (!bootstrap.CanSearch)
         {
             _mainWindow.ShowLauncher();

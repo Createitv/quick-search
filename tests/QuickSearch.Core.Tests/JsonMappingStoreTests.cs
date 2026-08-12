@@ -69,6 +69,7 @@ public sealed class JsonMappingStoreTests
                 GlobalShortcut = "Ctrl+Shift+G",
                 StartWithWindows = false,
                 AutomaticallyCheckForUpdates = false,
+                HasCompletedOnboarding = true,
                 LastUpdateCheckAtUtc = new DateTimeOffset(
                     2026,
                     8,
@@ -88,6 +89,7 @@ public sealed class JsonMappingStoreTests
         Assert.Equal("Ctrl+Shift+G", loaded.Settings.GlobalShortcut);
         Assert.False(loaded.Settings.StartWithWindows);
         Assert.False(loaded.Settings.AutomaticallyCheckForUpdates);
+        Assert.True(loaded.Settings.HasCompletedOnboarding);
         Assert.Equal(
             new DateTimeOffset(2026, 8, 12, 6, 30, 0, TimeSpan.Zero),
             loaded.Settings.LastUpdateCheckAtUtc);
