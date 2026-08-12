@@ -65,6 +65,80 @@ public sealed class QuickLauncherViewModelTests
     }
 
     [Fact]
+    public async Task ClipboardText_WithMatchingNavigation_IsPrefilledAndShowsResults()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddRule(
+            "项目资料",
+            ["项目资料"],
+            @"C:\Work\Projects",
+            configuration.UncategorizedFolderId);
+        var search = new FakeQuickLauncherSearch([]);
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            search,
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask,
+            new FakeClipboardTextReader(" 项目资料 "));
+
+        viewModel.PrefillFromClipboard();
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 1);
+
+        Assert.Equal("项目资料", viewModel.SearchText);
+        Assert.Equal("项目资料", viewModel.Results[0].Title);
+        Assert.Equal(0, search.CallCount);
+    }
+
+    [Fact]
+    public async Task ClipboardText_WithoutAnyMatch_IsRemovedForManualInput()
+    {
+        var configuration = new AppConfiguration();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            new FakeQuickLauncherSearch([]),
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask,
+            new FakeClipboardTextReader("没有任何结果"));
+
+        viewModel.PrefillFromClipboard();
+        await EventuallyAsync(() => !viewModel.IsSearching);
+
+        Assert.Equal(string.Empty, viewModel.SearchText);
+        Assert.Empty(viewModel.Results);
+        Assert.Contains("手动输入", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task ManualInput_DuringClipboardSearch_IsNotClearedByOldClipboardResult()
+    {
+        var configuration = new AppConfiguration();
+        var search = new DeferredQuickLauncherSearch();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            search,
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask,
+            new FakeClipboardTextReader("剪贴板文字"));
+
+        viewModel.PrefillFromClipboard();
+        var clipboardRequest = await search.WaitForRequestAsync("剪贴板文字");
+        viewModel.SearchText = "手动搜索";
+        var manualRequest = await search.WaitForRequestAsync("手动搜索");
+        manualRequest.Complete(
+        [
+            new("手动搜索结果", @"C:\Manual", QuickLauncherItemKind.Folder)
+        ]);
+        clipboardRequest.Complete([]);
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 1);
+
+        Assert.Equal("手动搜索", viewModel.SearchText);
+        Assert.Equal("手动搜索结果", viewModel.Results[0].Title);
+    }
+
+    [Fact]
     public async Task OpenShortcutAsync_OpensNumberedResultAndRequestsHide()
     {
         var configuration = new AppConfiguration();
@@ -161,6 +235,12 @@ public sealed class QuickLauncherViewModelTests
             OpenedPaths.Add(path);
             return PlatformOperationResult.Succeeded();
         }
+    }
+
+    private sealed class FakeClipboardTextReader(string? text) : IClipboardTextReader
+    {
+        public PlatformOperationResult<string?> ReadText() =>
+            PlatformOperationResult<string?>.Succeeded(text);
     }
 
     private sealed class DeferredQuickLauncherSearch : IQuickLauncherSearch

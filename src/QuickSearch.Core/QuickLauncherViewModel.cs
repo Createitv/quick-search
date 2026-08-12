@@ -8,7 +8,9 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     private readonly IQuickLauncherSearch _search;
     private readonly IPathOpener _opener;
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
+    private readonly IClipboardTextReader? _clipboard;
     private CancellationTokenSource? _searchCancellation;
+    private string? _clipboardQuery;
     private string _searchText = string.Empty;
     private IReadOnlyList<QuickLauncherResult> _results = [];
     private QuickLauncherResult? _selectedResult;
@@ -21,7 +23,8 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         IMappingStore store,
         IQuickLauncherSearch search,
         IPathOpener opener,
-        Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
+        Func<TimeSpan, CancellationToken, Task>? delayAsync = null,
+        IClipboardTextReader? clipboard = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(store);
@@ -32,6 +35,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         _search = search;
         _opener = opener;
         _delayAsync = delayAsync ?? Task.Delay;
+        _clipboard = clipboard;
     }
 
     public event EventHandler? HideRequested;
@@ -88,6 +92,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     public void Reset()
     {
         CancelSearch();
+        _clipboardQuery = null;
         _searchText = string.Empty;
         OnPropertyChanged(nameof(SearchText));
         Results = [];
@@ -95,6 +100,33 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         IsSearching = false;
         StatusText = "输入快捷导航名称，或搜索应用、文件和文件夹";
         OnPropertyChanged(nameof(LauncherShortcutText));
+    }
+
+    public void PrefillFromClipboard()
+    {
+        if (_clipboard is null)
+        {
+            return;
+        }
+
+        PlatformOperationResult<string?> result;
+        try
+        {
+            result = _clipboard.ReadText();
+        }
+        catch
+        {
+            return;
+        }
+
+        var query = result.Success ? result.Value?.Trim() ?? string.Empty : string.Empty;
+        if (query.Length == 0)
+        {
+            return;
+        }
+
+        _clipboardQuery = query;
+        SearchText = query;
     }
 
     public async Task<bool> OpenSelectedAsync()
@@ -173,6 +205,12 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     {
         CancelSearch();
         var query = SearchText.Trim();
+        if (_clipboardQuery is not null
+            && !string.Equals(_clipboardQuery, query, StringComparison.Ordinal))
+        {
+            _clipboardQuery = null;
+        }
+
         if (query.Length == 0)
         {
             Results = [];
@@ -216,6 +254,17 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
 
             Results = combined;
             SelectedResult = combined.FirstOrDefault();
+            if (combined.Length == 0 && IsClipboardQuery(query))
+            {
+                ClearClipboardQuery("剪贴板内容没有匹配项，请手动输入。");
+                return;
+            }
+
+            if (IsClipboardQuery(query))
+            {
+                _clipboardQuery = null;
+            }
+
             StatusText = combined.Length == 0
                 ? "快捷导航和 Everything 都没有找到匹配项"
                 : usedEverything
@@ -227,6 +276,12 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         }
         catch (Exception exception)
         {
+            if (IsClipboardQuery(query))
+            {
+                ClearClipboardQuery("无法搜索剪贴板内容，请手动输入。");
+                return;
+            }
+
             Results = [];
             SelectedResult = null;
             StatusText = $"搜索失败：{exception.Message}";
@@ -270,5 +325,20 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         var previous = Interlocked.Exchange(ref _searchCancellation, null);
         previous?.Cancel();
         previous?.Dispose();
+    }
+
+    private bool IsClipboardQuery(string query) => string.Equals(
+        _clipboardQuery,
+        query,
+        StringComparison.Ordinal);
+
+    private void ClearClipboardQuery(string statusText)
+    {
+        _clipboardQuery = null;
+        _searchText = string.Empty;
+        OnPropertyChanged(nameof(SearchText));
+        Results = [];
+        SelectedResult = null;
+        StatusText = statusText;
     }
 }

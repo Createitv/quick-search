@@ -49,7 +49,8 @@ public partial class MainWindow : Window, IDisposable
         EverythingBootstrapViewModel bootstrap,
         ApplicationUpdateViewModel update,
         IQuickLauncherSearch? launcherSearch = null,
-        IPathOpener? pathOpener = null)
+        IPathOpener? pathOpener = null,
+        IClipboardTextReader? launcherClipboard = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(store);
@@ -67,7 +68,8 @@ public partial class MainWindow : Window, IDisposable
             _viewModel.Configuration,
             _store,
             launcherSearch ?? new EmptyQuickLauncherSearch(),
-            pathOpener ?? new UnavailablePathOpener());
+            pathOpener ?? new UnavailablePathOpener(),
+            clipboard: launcherClipboard);
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;

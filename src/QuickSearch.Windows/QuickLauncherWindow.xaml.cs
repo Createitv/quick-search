@@ -31,6 +31,7 @@ public partial class QuickLauncherWindow : Window, IDisposable
         _openingSettings = false;
         _hideWhenDeactivated = hideWhenDeactivated;
         _viewModel.Reset();
+        _viewModel.PrefillFromClipboard();
         var workArea = SystemParameters.WorkArea;
         Left = workArea.Left + Math.Max(16, (workArea.Width - Width) / 2);
         Top = workArea.Top + Math.Max(48, workArea.Height * 0.16);

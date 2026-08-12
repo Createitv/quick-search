@@ -89,10 +89,11 @@ public partial class App : System.Windows.Application
         var bootstrap = new EverythingBootstrapViewModel(
             new EverythingInstallationManager(native, AppContext.BaseDirectory));
         var startup = new StartupRegistration();
+        var clipboard = new ClipboardTextReader();
         var launcherViewModel = new LauncherViewModel(
             store,
             search,
-            new ClipboardTextReader(),
+            clipboard,
             new ExplorerFolderOpener());
         var pathOpener = new ShellPathOpener();
         _mainWindow = new MainWindow(
@@ -103,7 +104,8 @@ public partial class App : System.Windows.Application
             bootstrap,
             update,
             search,
-            pathOpener);
+            pathOpener,
+            clipboard);
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();

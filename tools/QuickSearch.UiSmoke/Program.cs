@@ -26,13 +26,15 @@ internal static class Program
             var update = new ApplicationUpdateViewModel(
                 new CurrentApplicationUpdateService(),
                 "0.0.4");
+            var clipboard = new MutableClipboardTextReader("项目文件");
             var mainWindow = new MainWindow(
                 launcher,
                 store,
                 search,
                 new SuccessfulStartupRegistration(),
                 bootstrap,
-                update);
+                update,
+                launcherClipboard: clipboard);
             application.MainWindow = mainWindow;
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
             mainWindow.Show();
@@ -47,6 +49,35 @@ internal static class Program
             if (launcherWindow is null || !launcherWindow.IsVisible)
             {
                 Console.Error.WriteLine("Quick launcher window did not become visible.");
+                return 2;
+            }
+
+            Thread.Sleep(250);
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
+            var launcherSearchBox = launcherWindow.FindName("LauncherSearchBox")
+                as System.Windows.Controls.TextBox;
+            var launcherResults = launcherWindow.FindName("ResultsList")
+                as System.Windows.Controls.ListBox;
+            if (launcherSearchBox?.Text != "项目文件"
+                || launcherResults?.Items.Count != 1)
+            {
+                Console.Error.WriteLine("Clipboard match was not shown in the quick launcher.");
+                return 2;
+            }
+
+            clipboard.Text = "没有任何结果";
+            launcherWindow.Hide();
+            mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);
+            Thread.Sleep(250);
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
+            if (launcherSearchBox.Text.Length != 0
+                || launcherResults.Items.Count != 0)
+            {
+                Console.Error.WriteLine("Unmatched clipboard text was not cleared from the quick launcher.");
                 return 2;
             }
 
@@ -182,6 +213,14 @@ sealed class EmptyClipboardReader : IClipboardTextReader
 {
     public PlatformOperationResult<string?> ReadText() =>
         PlatformOperationResult<string?>.Succeeded(string.Empty);
+}
+
+sealed class MutableClipboardTextReader(string? text) : IClipboardTextReader
+{
+    public string? Text { get; set; } = text;
+
+    public PlatformOperationResult<string?> ReadText() =>
+        PlatformOperationResult<string?>.Succeeded(Text);
 }
 
 sealed class SuccessfulFolderOpener : IFolderOpener
