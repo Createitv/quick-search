@@ -64,7 +64,9 @@ internal static class Program
             }
 
             if (application.Windows.OfType<System.Windows.Window>()
-                .Any(window => window != mainWindow && window.IsVisible))
+                .Any(window => window != mainWindow
+                               && window is not QuickLauncherWindow
+                               && window.IsVisible))
             {
                 Console.Error.WriteLine("Settings unexpectedly opened a separate window.");
                 return 2;
