@@ -11,26 +11,50 @@ internal static class Program
         {
             var application = new App();
             application.InitializeComponent();
-            var configuration = new AppConfiguration();
-            var settings = new SettingsViewModel(
-                configuration,
-                new MemoryMappingStore(configuration),
-                new UnavailableHotkeyRegistration("Ctrl+Alt+F", "UI smoke"),
+            var configuration = CreateConfiguration();
+            var store = new MemoryMappingStore(configuration);
+            var search = new ReadyFolderSearch();
+            var launcher = new LauncherViewModel(
+                store,
+                search,
+                new EmptyClipboardReader(),
+                new SuccessfulFolderOpener(),
+                _ => true);
+            var bootstrap = new EverythingBootstrapViewModel(
+                new ReadyEverythingInstallationManager());
+            var update = new ApplicationUpdateViewModel(
+                new CurrentApplicationUpdateService(),
+                "0.0.4");
+            var mainWindow = new MainWindow(
+                launcher,
+                store,
+                search,
                 new SuccessfulStartupRegistration(),
-                new ReadyFolderSearch());
-            var window = new SettingsWindow(settings);
-            window.Show();
-            window.UpdateLayout();
+                bootstrap,
+                update);
+            application.MainWindow = mainWindow;
+            mainWindow.InitializeAsync().GetAwaiter().GetResult();
+            mainWindow.Show();
+            mainWindow.UpdateLayout();
+            launcher.ShowSettingsCommand.Execute(null);
             application.Dispatcher.Invoke(
                 () => { },
                 DispatcherPriority.Render);
-            if (!window.IsVisible)
+            var window = application.Windows
+                .OfType<SettingsWindow>()
+                .SingleOrDefault();
+            if (window is null || !window.IsVisible)
             {
                 Console.Error.WriteLine("Settings window did not become visible.");
                 return 2;
             }
 
+            window.UpdateLayout();
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
             window.AllowApplicationExit();
+            mainWindow.ExitApplication();
             Console.WriteLine("QuickSearch settings window smoke check passed.");
             return 0;
         }
@@ -39,6 +63,17 @@ internal static class Program
             Console.Error.WriteLine(exception);
             return 1;
         }
+    }
+
+    private static AppConfiguration CreateConfiguration()
+    {
+        var configuration = new AppConfiguration();
+        var projects = configuration.AddNavigationFolder("项目", null);
+        var customer = configuration.AddNavigationFolder("客户", projects.Id);
+        var delivery = configuration.AddNavigationFolder("交付", customer.Id);
+        configuration.AddRule("项目文件", ["项目", "客户"], @"C:\Projects", delivery.Id);
+        configuration.PinFolder(projects.Id);
+        return configuration;
     }
 }
 
@@ -68,4 +103,46 @@ sealed class ReadyFolderSearch : IFolderSearch
         string query,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
+}
+
+sealed class EmptyClipboardReader : IClipboardTextReader
+{
+    public PlatformOperationResult<string?> ReadText() =>
+        PlatformOperationResult<string?>.Succeeded(string.Empty);
+}
+
+sealed class SuccessfulFolderOpener : IFolderOpener
+{
+    public PlatformOperationResult Open(string folderPath) =>
+        PlatformOperationResult.Succeeded();
+}
+
+sealed class ReadyEverythingInstallationManager : IEverythingInstallationManager
+{
+    public Task<EverythingBootstrapResult> CheckAndStartAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(new EverythingBootstrapResult(
+            EverythingBootstrapState.Ready,
+            "Everything 已就绪。"));
+
+    public Task<EverythingBootstrapResult> InstallAndStartAsync(
+        CancellationToken cancellationToken = default) =>
+        CheckAndStartAsync(cancellationToken);
+}
+
+sealed class CurrentApplicationUpdateService : IApplicationUpdateService
+{
+    public Task<ApplicationUpdateCheck> CheckAsync(
+        AppReleaseVersion installedVersion,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(ApplicationUpdateCheck.Current(installedVersion.ToString()));
+
+    public Task<string> DownloadAndVerifyAsync(
+        ApplicationRelease release,
+        IProgress<double>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException();
+
+    public PlatformOperationResult LaunchInstaller(string installerPath) =>
+        PlatformOperationResult.Failed("Not available in UI smoke test.");
 }
