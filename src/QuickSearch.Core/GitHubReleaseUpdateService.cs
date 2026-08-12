@@ -139,9 +139,13 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
                 }
             }
 
-            await using var downloaded = File.OpenRead(temporaryPath);
-            var actualHash = Convert.ToHexString(
-                await SHA256.HashDataAsync(downloaded, cancellationToken));
+            string actualHash;
+            await using (var downloaded = File.OpenRead(temporaryPath))
+            {
+                actualHash = Convert.ToHexString(
+                    await SHA256.HashDataAsync(downloaded, cancellationToken));
+            }
+
             if (!string.Equals(expectedHash, actualHash, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidDataException("安装包 SHA-256 校验失败，已取消安装。");
