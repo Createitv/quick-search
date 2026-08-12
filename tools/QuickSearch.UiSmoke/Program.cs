@@ -39,6 +39,8 @@ internal static class Program
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
             mainWindow.Show();
             mainWindow.UpdateLayout();
+            SynchronizationContext.SetSynchronizationContext(
+                new DispatcherSynchronizationContext(application.Dispatcher));
             mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);
             application.Dispatcher.Invoke(
                 () => { },
