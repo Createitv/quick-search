@@ -15,6 +15,13 @@ public partial class App : System.Windows.Application
 
     protected override async void OnStartup(System.Windows.StartupEventArgs e)
     {
+        if (AppContext.TryGetSwitch("QuickSearch.UiSmoke", out var isUiSmoke)
+            && isUiSmoke)
+        {
+            base.OnStartup(e);
+            return;
+        }
+
         var serviceResult = PlatformBoundary.Capture<ISingleInstanceService>(
             () => new NamedEventSingleInstance(),
             "无法初始化单实例服务");

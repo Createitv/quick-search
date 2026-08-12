@@ -9,6 +9,7 @@ internal static class Program
     {
         try
         {
+            AppContext.SetSwitch("QuickSearch.UiSmoke", true);
             var application = new App();
             application.InitializeComponent();
             var configuration = CreateConfiguration();

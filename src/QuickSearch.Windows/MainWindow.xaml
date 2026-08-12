@@ -703,7 +703,7 @@
               <RowDefinition Height="6" />
               <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressValue}"
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ProgressValue, Mode=OneWay}"
                          Height="6" BorderThickness="0" Background="{DynamicResource SoftBlueBrush}"
                          Foreground="{DynamicResource RouteBlueBrush}" />
             <Grid Grid.Row="1" Margin="46,34">
