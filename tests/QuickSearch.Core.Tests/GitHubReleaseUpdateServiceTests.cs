@@ -6,27 +6,14 @@ namespace QuickSearch.Core.Tests;
 public sealed class GitHubReleaseUpdateServiceTests
 {
     [Fact]
-    public async Task CheckAsync_UsesExactInstallerAndChecksumAssetsFromLatestRelease()
+    public async Task CheckAsync_UsesLatestReleaseRedirectWithoutCallingRateLimitedApi()
     {
-        const string json = """
-            {
-              "tag_name": "v0.0.3",
-              "html_url": "https://github.com/Createitv/quick-search/releases/tag/v0.0.3",
-              "draft": false,
-              "prerelease": false,
-              "assets": [
-                {
-                  "name": "QuickSearch-Setup-v0.0.3.exe",
-                  "browser_download_url": "https://github.com/Createitv/quick-search/releases/download/v0.0.3/QuickSearch-Setup-v0.0.3.exe"
-                },
-                {
-                  "name": "QuickSearch-Setup-v0.0.3.exe.sha256",
-                  "browser_download_url": "https://github.com/Createitv/quick-search/releases/download/v0.0.3/QuickSearch-Setup-v0.0.3.exe.sha256"
-                }
-              ]
-            }
-            """;
-        using var client = new HttpClient(new StubHttpHandler(_ => Json(json)));
+        Uri? requestedUri = null;
+        using var client = new HttpClient(new StubHttpHandler(request =>
+        {
+            requestedUri = request.RequestUri;
+            return RedirectedRelease("0.0.3");
+        }));
         var service = new GitHubReleaseUpdateService(
             client,
             "Createitv",
@@ -36,6 +23,10 @@ public sealed class GitHubReleaseUpdateServiceTests
 
         var result = await service.CheckAsync(AppReleaseVersion.Parse("0.0.2"));
 
+        Assert.Equal(
+            "https://github.com/Createitv/quick-search/releases/latest",
+            requestedUri?.AbsoluteUri);
+        Assert.DoesNotContain("api.github.com", requestedUri?.Host ?? string.Empty);
         Assert.True(result.IsUpdateAvailable);
         Assert.Equal("0.0.3", result.LatestVersion);
         Assert.Equal(
@@ -47,23 +38,10 @@ public sealed class GitHubReleaseUpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckAsync_RejectsReleaseWithoutRequiredChecksumAsset()
+    public async Task CheckAsync_WhenInstalledVersionIsCurrent_DoesNotOfferUpdate()
     {
-        const string json = """
-            {
-              "tag_name": "v0.0.3",
-              "html_url": "https://github.com/Createitv/quick-search/releases/tag/v0.0.3",
-              "draft": false,
-              "prerelease": false,
-              "assets": [
-                {
-                  "name": "QuickSearch-Setup-v0.0.3.exe",
-                  "browser_download_url": "https://github.com/Createitv/quick-search/releases/download/v0.0.3/QuickSearch-Setup-v0.0.3.exe"
-                }
-              ]
-            }
-            """;
-        using var client = new HttpClient(new StubHttpHandler(_ => Json(json)));
+        using var client = new HttpClient(new StubHttpHandler(_ =>
+            RedirectedRelease("0.0.8")));
         var service = new GitHubReleaseUpdateService(
             client,
             "Createitv",
@@ -71,10 +49,32 @@ public sealed class GitHubReleaseUpdateServiceTests
             Path.GetTempPath(),
             new FakeInstallerLauncher());
 
-        var exception = await Assert.ThrowsAsync<InvalidDataException>(
-            () => service.CheckAsync(AppReleaseVersion.Parse("0.0.2")));
+        var result = await service.CheckAsync(AppReleaseVersion.Parse("0.0.8"));
 
-        Assert.Contains("SHA-256", exception.Message);
+        Assert.False(result.IsUpdateAvailable);
+        Assert.Equal("0.0.8", result.LatestVersion);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    public async Task CheckAsync_WhenGitHubRejectsRequest_UsesFriendlyMessage(
+        HttpStatusCode statusCode)
+    {
+        using var client = new HttpClient(new StubHttpHandler(_ =>
+            new HttpResponseMessage(statusCode)));
+        var service = new GitHubReleaseUpdateService(
+            client,
+            "Createitv",
+            "quick-search",
+            Path.GetTempPath(),
+            new FakeInstallerLauncher());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.CheckAsync(AppReleaseVersion.Parse("0.0.8")));
+
+        Assert.Contains("GitHub", exception.Message);
+        Assert.DoesNotContain("Response status code", exception.Message);
     }
 
     [Fact]
@@ -167,9 +167,11 @@ public sealed class GitHubReleaseUpdateServiceTests
         new Uri($"https://github.com/Createitv/quick-search/releases/download/v{version}/QuickSearch-Setup-v{version}.exe"),
         new Uri($"https://github.com/Createitv/quick-search/releases/download/v{version}/QuickSearch-Setup-v{version}.exe.sha256"));
 
-    private static HttpResponseMessage Json(string value) => new(HttpStatusCode.OK)
+    private static HttpResponseMessage RedirectedRelease(string version) => new(HttpStatusCode.OK)
     {
-        Content = new StringContent(value, Encoding.UTF8, "application/json")
+        RequestMessage = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://github.com/Createitv/quick-search/releases/tag/v{version}")
     };
 
     private static HttpResponseMessage Text(string value) => new(HttpStatusCode.OK)

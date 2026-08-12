@@ -1,7 +1,5 @@
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace QuickSearch.Core;
 
@@ -42,23 +40,18 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
         AppReleaseVersion installedVersion,
         CancellationToken cancellationToken = default)
     {
-        var apiUri = new Uri(
-            $"https://api.github.com/repos/{Uri.EscapeDataString(_owner)}/{Uri.EscapeDataString(_repository)}/releases/latest");
-        using var request = CreateRequest(apiUri);
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        response.EnsureSuccessStatusCode();
-        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var payload = await JsonSerializer.DeserializeAsync<ReleasePayload>(
-            responseStream,
-            cancellationToken: cancellationToken)
-            ?? throw new InvalidDataException("GitHub Release 返回了空响应。");
+        var latestReleaseUri = BuildGitHubUri("releases/latest");
+        using var request = CreateRequest(latestReleaseUri, "text/html");
+        using var response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        EnsureSuccessfulResponse(response, "检查更新");
 
-        if (payload.Draft || payload.Prerelease)
-        {
-            throw new InvalidDataException("GitHub 最新版本不是可自动安装的正式版本。");
-        }
-
-        var latestVersion = AppReleaseVersion.Parse(payload.TagName);
+        var releasePageUri = response.RequestMessage?.RequestUri
+            ?? throw new InvalidDataException("GitHub 没有返回最新版本地址。");
+        var tagName = ParseReleaseTag(releasePageUri);
+        var latestVersion = AppReleaseVersion.Parse(tagName);
         if (!latestVersion.IsNewerThan(installedVersion))
         {
             return ApplicationUpdateCheck.Current(latestVersion.ToString());
@@ -67,9 +60,11 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
         var version = latestVersion.ToString();
         var installerName = $"QuickSearch-Setup-v{version}.exe";
         var checksumName = $"{installerName}.sha256";
-        var installerUri = FindRequiredAsset(payload.Assets, installerName, "安装包");
-        var checksumUri = FindRequiredAsset(payload.Assets, checksumName, "SHA-256 校验文件");
-        var releasePageUri = RequireHttpsUri(payload.HtmlUrl, "Release 页面");
+        var escapedTag = Uri.EscapeDataString(tagName);
+        var installerUri = BuildGitHubUri(
+            $"releases/download/{escapedTag}/{Uri.EscapeDataString(installerName)}");
+        var checksumUri = BuildGitHubUri(
+            $"releases/download/{escapedTag}/{Uri.EscapeDataString(checksumName)}");
 
         return ApplicationUpdateCheck.Available(new ApplicationRelease(
             version,
@@ -92,7 +87,7 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
         using var checksumResponse = await _httpClient.SendAsync(
             checksumRequest,
             cancellationToken);
-        checksumResponse.EnsureSuccessStatusCode();
+        EnsureSuccessfulResponse(checksumResponse, "下载校验文件");
         var checksumText = await checksumResponse.Content.ReadAsStringAsync(cancellationToken);
         var expectedHash = ParseSha256(checksumText);
 
@@ -109,7 +104,7 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
                 installerRequest,
                 HttpCompletionOption.ResponseHeadersRead,
                 cancellationToken);
-            installerResponse.EnsureSuccessStatusCode();
+            EnsureSuccessfulResponse(installerResponse, "下载安装包");
             var contentLength = installerResponse.Content.Headers.ContentLength;
             await using (var source = await installerResponse.Content.ReadAsStreamAsync(cancellationToken))
             await using (var destination = new FileStream(
@@ -169,28 +164,71 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
     public PlatformOperationResult LaunchInstaller(string installerPath) =>
         _installerLauncher.Launch(installerPath);
 
-    private static HttpRequestMessage CreateRequest(Uri uri)
+    private static HttpRequestMessage CreateRequest(
+        Uri uri,
+        string acceptMediaType = "application/octet-stream")
     {
         var request = new HttpRequestMessage(HttpMethod.Get, uri);
         request.Headers.UserAgent.Add(ProductInfoHeaderValue.Parse(UserAgent));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
-        request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(acceptMediaType));
         return request;
     }
 
-    private static Uri FindRequiredAsset(
-        IReadOnlyList<ReleaseAssetPayload> assets,
-        string expectedName,
-        string description)
+    private Uri BuildGitHubUri(string relativePath) => new(
+        $"https://github.com/{Uri.EscapeDataString(_owner)}/" +
+        $"{Uri.EscapeDataString(_repository)}/{relativePath}");
+
+    private string ParseReleaseTag(Uri releasePageUri)
     {
-        var asset = assets.SingleOrDefault(candidate =>
-            string.Equals(candidate.Name, expectedName, StringComparison.Ordinal));
-        if (asset is null)
+        if (!string.Equals(
+                releasePageUri.Scheme,
+                Uri.UriSchemeHttps,
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                releasePageUri.Host,
+                "github.com",
+                StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidDataException($"Release 缺少必需的{description}：{expectedName}");
+            throw new InvalidDataException("GitHub 最新版本跳转到了不安全的地址。");
         }
 
-        return RequireHttpsUri(asset.DownloadUrl, description);
+        var expectedPrefix =
+            $"/{_owner}/{_repository}/releases/tag/";
+        if (!releasePageUri.AbsolutePath.StartsWith(
+                expectedPrefix,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("GitHub 最新版本地址中缺少版本标签。");
+        }
+
+        var tagName = Uri.UnescapeDataString(
+            releasePageUri.AbsolutePath[expectedPrefix.Length..]);
+        if (string.IsNullOrWhiteSpace(tagName) || tagName.Contains('/'))
+        {
+            throw new InvalidDataException("GitHub 最新版本标签格式无效。");
+        }
+
+        return tagName;
+    }
+
+    private static void EnsureSuccessfulResponse(
+        HttpResponseMessage response,
+        string operation)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        if (response.StatusCode is System.Net.HttpStatusCode.Forbidden
+            or System.Net.HttpStatusCode.TooManyRequests)
+        {
+            throw new InvalidOperationException(
+                $"GitHub 暂时限制了更新请求，请稍后再试（{(int)response.StatusCode}）。");
+        }
+
+        throw new InvalidOperationException(
+            $"{operation}失败：GitHub 返回 HTTP {(int)response.StatusCode}。");
     }
 
     private static Uri RequireHttpsUri(string value, string description)
@@ -220,14 +258,4 @@ public sealed class GitHubReleaseUpdateService : IApplicationUpdateService
         return hash;
     }
 
-    private sealed record ReleasePayload(
-        [property: JsonPropertyName("tag_name")] string TagName,
-        [property: JsonPropertyName("html_url")] string HtmlUrl,
-        [property: JsonPropertyName("draft")] bool Draft,
-        [property: JsonPropertyName("prerelease")] bool Prerelease,
-        [property: JsonPropertyName("assets")] IReadOnlyList<ReleaseAssetPayload> Assets);
-
-    private sealed record ReleaseAssetPayload(
-        [property: JsonPropertyName("name")] string Name,
-        [property: JsonPropertyName("browser_download_url")] string DownloadUrl);
 }
