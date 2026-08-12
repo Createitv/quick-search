@@ -316,7 +316,7 @@ public partial class MainWindow : Window, IDisposable
         e.Handled = true;
     }
 
-    private static void PinnedFolder_DragLeave(object sender, DragEventArgs e)
+    private void PinnedFolder_DragLeave(object sender, DragEventArgs e)
     {
         ResetPinnedFolderDropIndicator(sender as Button);
     }
@@ -399,7 +399,7 @@ public partial class MainWindow : Window, IDisposable
         e.Handled = true;
     }
 
-    private static void Folder_DragLeave(object sender, DragEventArgs e) =>
+    private void Folder_DragLeave(object sender, DragEventArgs e) =>
         ResetFolderDropIndicator(sender as Button);
 
     private void Folder_Drop(object sender, DragEventArgs e)
