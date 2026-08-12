@@ -83,7 +83,7 @@
                   <CheckBox Margin="0,12,0,0" Content="每次启动时自动检查更新"
                             IsChecked="{Binding AutomaticallyCheckForUpdates}" />
                   <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
-                               Value="{Binding Update.DownloadProgress}" />
+                               Value="{Binding Update.DownloadProgress, Mode=OneWay}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Margin="18,0,0,0" Orientation="Horizontal"
                             VerticalAlignment="Top">
