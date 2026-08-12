@@ -37,11 +37,5 @@ public interface IApplicationUpdateService
 
 public static class UpdateCheckPolicy
 {
-    public static bool ShouldCheckAutomatically(
-        bool enabled,
-        DateTimeOffset? lastCheckedAtUtc,
-        DateTimeOffset nowUtc) =>
-        enabled
-        && (lastCheckedAtUtc is null
-            || nowUtc - lastCheckedAtUtc.Value >= TimeSpan.FromHours(24));
+    public static bool ShouldCheckAutomatically(bool enabled) => enabled;
 }

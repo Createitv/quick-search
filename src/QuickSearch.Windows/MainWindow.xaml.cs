@@ -71,30 +71,13 @@ public partial class MainWindow : Window, IDisposable
     public async Task CheckForUpdatesOnStartupAsync()
     {
         var settings = _viewModel.Configuration.Settings;
-        var checkedAtUtc = DateTimeOffset.UtcNow;
         if (!UpdateCheckPolicy.ShouldCheckAutomatically(
-                settings.AutomaticallyCheckForUpdates,
-                settings.LastUpdateCheckAtUtc,
-                checkedAtUtc))
+                settings.AutomaticallyCheckForUpdates))
         {
             return;
         }
 
         await _update.CheckNowAsync();
-        try
-        {
-            _viewModel.Configuration.Settings =
-                _viewModel.Configuration.Settings with
-                {
-                    LastUpdateCheckAtUtc = checkedAtUtc
-                };
-            await _store.SaveAsync(_viewModel.Configuration);
-        }
-        catch (Exception exception)
-        {
-            _viewModel.ReportStatus($"无法记录更新检查时间：{exception.Message}");
-        }
-
         if (_update.State == ApplicationUpdateState.Available)
         {
             _viewModel.ReportStatus(

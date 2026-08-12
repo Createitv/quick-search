@@ -60,7 +60,7 @@
                   </TextBlock>
                   <TextBlock Margin="0,4,0,0" Text="{Binding Update.StatusText}"
                              Style="{StaticResource SecondaryTextStyle}" />
-                  <CheckBox Margin="0,12,0,0" Content="启动时自动检查更新（最多每天一次）"
+                  <CheckBox Margin="0,12,0,0" Content="每次启动时自动检查更新"
                             IsChecked="{Binding AutomaticallyCheckForUpdates}" />
                   <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
                                Value="{Binding Update.DownloadProgress}" />
