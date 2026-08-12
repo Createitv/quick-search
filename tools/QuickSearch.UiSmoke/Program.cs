@@ -77,7 +77,13 @@ internal static class Program
             if (launcherSearchBox.Text.Length != 0
                 || launcherResults.Items.Count != 0)
             {
-                Console.Error.WriteLine("Unmatched clipboard text was not cleared from the quick launcher.");
+                var launcherState = launcherWindow.DataContext as QuickLauncherViewModel;
+                Console.Error.WriteLine(
+                    "Unmatched clipboard text was not cleared from the quick launcher. "
+                    + $"TextBox='{launcherSearchBox.Text}', Items={launcherResults.Items.Count}, "
+                    + $"ViewModelText='{launcherState?.SearchText}', "
+                    + $"ViewModelItems={launcherState?.Results.Count}, "
+                    + $"IsSearching={launcherState?.IsSearching}, Status='{launcherState?.StatusText}'.");
                 return 2;
             }
 
