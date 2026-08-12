@@ -29,6 +29,13 @@ public sealed class JsonMappingStoreTests
         var configuration = await store.LoadAsync();
 
         Assert.Equal(2, configuration.FindMappings("sales team").Count);
+        Assert.Equal(2, configuration.Settings.SchemaVersion);
+        Assert.Equal(2, configuration.Rules.Count);
+        Assert.All(
+            configuration.Rules,
+            rule => Assert.Equal(
+                configuration.UncategorizedFolderId,
+                rule.NavigationFolderId));
         Assert.Equal(
             [@"C:\Sales\Old", @"D:\Sales\Current"],
             configuration.Mappings.Select(mapping => mapping.FolderPath));
@@ -71,6 +78,52 @@ public sealed class JsonMappingStoreTests
         Assert.Equal("Ctrl+Shift+G", loaded.Settings.GlobalShortcut);
         Assert.False(loaded.Settings.StartWithWindows);
         Assert.Equal(configuration.Mappings, loaded.Mappings);
+        Assert.Equal(
+            configuration.Rules.Select(rule => (
+                rule.Id,
+                rule.Title,
+                Aliases: string.Join('|', rule.Aliases),
+                rule.FolderPath,
+                rule.NavigationFolderId,
+                rule.SortOrder,
+                rule.CreatedAtUtc,
+                rule.UpdatedAtUtc,
+                rule.LastUsedAtUtc)),
+            loaded.Rules.Select(rule => (
+                rule.Id,
+                rule.Title,
+                Aliases: string.Join('|', rule.Aliases),
+                rule.FolderPath,
+                rule.NavigationFolderId,
+                rule.SortOrder,
+                rule.CreatedAtUtc,
+                rule.UpdatedAtUtc,
+                rule.LastUsedAtUtc)));
+        Assert.Equal(configuration.NavigationFolders, loaded.NavigationFolders);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WritesSchemaTwoCatalogWithoutLegacyMappings()
+    {
+        using var tempDirectory = new TempDirectory();
+        var configPath = Path.Combine(tempDirectory.Path, "config.json");
+        var store = new JsonMappingStore(configPath);
+        var configuration = new AppConfiguration();
+        var customer = configuration.AddNavigationFolder("客户", parentId: null);
+        configuration.AddRule("文档", ["docs", "manual"], @"C:\Docs", customer.Id);
+        configuration.PinFolder(customer.Id);
+
+        await store.SaveAsync(configuration);
+
+        var json = await File.ReadAllTextAsync(configPath);
+        Assert.Contains("\"rules\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"navigationFolders\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\"pinnedFolderIds\"", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\"mappings\"", json, StringComparison.OrdinalIgnoreCase);
+
+        var loaded = await store.LoadAsync();
+        Assert.Equal([customer.Id], loaded.PinnedFolderIds);
+        Assert.Equal(["docs", "manual"], Assert.Single(loaded.Rules).Aliases);
     }
 
     [Fact]

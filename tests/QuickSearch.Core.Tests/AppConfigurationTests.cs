@@ -3,9 +3,65 @@ namespace QuickSearch.Core.Tests;
 public sealed class AppConfigurationTests
 {
     [Fact]
-    public void AppSettings_DefaultsSchemaVersionToOne()
+    public void AppSettings_DefaultsSchemaVersionToTwo()
     {
-        Assert.Equal(1, new AppSettings().SchemaVersion);
+        Assert.Equal(2, new AppSettings().SchemaVersion);
+    }
+
+    [Fact]
+    public void NavigationFolders_RejectCyclesButAllowSameNameInDifferentParents()
+    {
+        var configuration = new AppConfiguration();
+        var customer = configuration.AddNavigationFolder("客户", parentId: null);
+        var project = configuration.AddNavigationFolder("项目", customer.Id);
+        var archive = configuration.AddNavigationFolder("归档", project.Id);
+        var personal = configuration.AddNavigationFolder("个人", parentId: null);
+
+        configuration.AddNavigationFolder("项目", personal.Id);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            configuration.MoveNavigationFolder(customer.Id, archive.Id, 0));
+        Assert.Throws<InvalidOperationException>(() =>
+            configuration.AddNavigationFolder("项目", customer.Id));
+    }
+
+    [Fact]
+    public void PinnedFolders_PreserveExplicitOrderWithoutDuplicates()
+    {
+        var configuration = new AppConfiguration();
+        var customer = configuration.AddNavigationFolder("客户", parentId: null);
+        var project = configuration.AddNavigationFolder("项目", parentId: null);
+
+        configuration.PinFolder(customer.Id);
+        configuration.PinFolder(project.Id);
+        configuration.PinFolder(customer.Id);
+        configuration.ReorderPinnedFolder(project.Id, 0);
+
+        Assert.Equal([project.Id, customer.Id], configuration.PinnedFolderIds);
+    }
+
+    [Fact]
+    public void AddRule_MergesAliasesForTheSamePhysicalPath()
+    {
+        var configuration = new AppConfiguration();
+        var customer = configuration.AddNavigationFolder("客户", parentId: null);
+
+        var first = configuration.AddRule(
+            "文档",
+            ["docs"],
+            @"C:\Work\Docs",
+            customer.Id);
+        var merged = configuration.AddRule(
+            "",
+            ["manual", "DOCS"],
+            @"c:\work\docs",
+            customer.Id);
+
+        Assert.Equal(first.Id, merged.Id);
+        var rule = Assert.Single(configuration.Rules);
+        Assert.Equal(["docs", "manual"], rule.Aliases);
+        Assert.Single(configuration.FindMappings("docs"));
+        Assert.Single(configuration.FindMappings("manual"));
     }
 
     [Fact]
@@ -80,7 +136,7 @@ public sealed class AppConfigurationTests
 
         Assert.Single(configuration.Mappings);
         Assert.Equal(@"D:\Sales\Current", overwritten.FolderPath);
-        Assert.Same(overwritten, configuration.FindMapping("sales team"));
+        Assert.Equal(overwritten, configuration.FindMapping("sales team"));
     }
 
     [Fact]
@@ -140,7 +196,7 @@ public sealed class AppConfigurationTests
         Assert.Equal(createdAtUtc, used.CreatedAtUtc);
         Assert.Equal(createdAtUtc, used.UpdatedAtUtc);
         Assert.Equal(usedAtUtc, used.LastUsedAtUtc);
-        Assert.Same(used, configuration.FindMapping("sales team"));
+        Assert.Equal(used, configuration.FindMapping("sales team"));
 
         timeProvider.UtcNow = updatedAtUtc;
         var updated = configuration.UpsertMapping(
@@ -216,7 +272,7 @@ public sealed class AppConfigurationTests
             @"c:\alpha");
 
         Assert.Equal(2, configuration.FindMappings("project alpha").Count);
-        Assert.Same(current, duplicate);
+        Assert.Equal(current, duplicate);
         Assert.NotSame(current, archive);
     }
 

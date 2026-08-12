@@ -39,10 +39,23 @@ public sealed class JsonMappingStore : IMappingStore
 
         try
         {
-            return JsonSerializer.Deserialize<AppConfiguration>(
-                       json,
-                       SerializerOptions)
-                   ?? throw new JsonException("Configuration JSON was null.");
+            using var document = JsonDocument.Parse(json);
+            if (HasProperty(document.RootElement, "rules"))
+            {
+                return JsonSerializer.Deserialize<AppConfiguration>(
+                           json,
+                           SerializerOptions)
+                       ?? throw new JsonException("Configuration JSON was null.");
+            }
+
+            var legacy = JsonSerializer.Deserialize<LegacyConfiguration>(
+                             json,
+                             SerializerOptions)
+                         ?? throw new JsonException("Configuration JSON was null.");
+            return ConfigurationMigrator.FromLegacy(
+                legacy.Settings with { SchemaVersion = 1 },
+                legacy.Mappings,
+                _timeProvider);
         }
         catch (JsonException)
         {
@@ -60,6 +73,11 @@ public sealed class JsonMappingStore : IMappingStore
 
         var directoryPath = Path.GetDirectoryName(_configPath)!;
         Directory.CreateDirectory(directoryPath);
+        if (configuration.Settings.SchemaVersion < 2)
+        {
+            configuration.Settings = configuration.Settings with { SchemaVersion = 2 };
+        }
+
         var json = JsonSerializer.Serialize(configuration, SerializerOptions);
         var temporaryPath = Path.Combine(
             directoryPath,
@@ -108,5 +126,18 @@ public sealed class JsonMappingStore : IMappingStore
         return Path.Combine(
             directoryPath,
             $"{baseName}.corrupt-{timestamp}{extension}");
+    }
+
+    private static bool HasProperty(JsonElement element, string propertyName) =>
+        element.EnumerateObject().Any(property => string.Equals(
+            property.Name,
+            propertyName,
+            StringComparison.OrdinalIgnoreCase));
+
+    private sealed class LegacyConfiguration
+    {
+        public AppSettings Settings { get; init; } = new() { SchemaVersion = 1 };
+
+        public IReadOnlyList<FolderMapping> Mappings { get; init; } = [];
     }
 }
