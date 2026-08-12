@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using QuickSearch.Core;
+using MessageBox = System.Windows.MessageBox;
 
 namespace QuickSearch.Windows;
 

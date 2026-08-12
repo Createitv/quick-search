@@ -2,6 +2,8 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using Microsoft.Win32;
 using QuickSearch.Core;
+using File = System.IO.File;
+using Path = System.IO.Path;
 
 namespace QuickSearch.Windows;
 
