@@ -168,7 +168,7 @@ public partial class MainWindow : Window, IDisposable
         _settingsWindow.Activate();
     }
 
-    public void ShowQuickLauncher()
+    public void ShowQuickLauncher(bool hideWhenDeactivated = true)
     {
         if (_quickLauncherWindow is null)
         {
@@ -176,7 +176,7 @@ public partial class MainWindow : Window, IDisposable
             _quickLauncherWindow.SettingsRequested += QuickLauncherWindow_SettingsRequested;
         }
 
-        _quickLauncherWindow.ShowLauncher();
+        _quickLauncherWindow.ShowLauncher(hideWhenDeactivated);
     }
 
     public void ReportStatus(string message) => _viewModel.ReportStatus(message);

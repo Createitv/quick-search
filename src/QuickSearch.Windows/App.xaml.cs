@@ -160,7 +160,7 @@ public partial class App : System.Windows.Application
         _trayController = new TrayIconController(
             trayResult.Value,
             () => Dispatcher.Invoke(_mainWindow.ShowLauncher),
-            () => Dispatcher.Invoke(_mainWindow.ShowQuickLauncher),
+            () => Dispatcher.Invoke(() => _mainWindow.ShowQuickLauncher()),
             () => Dispatcher.Invoke(_mainWindow.ShowSettings),
             () => Dispatcher.Invoke(_mainWindow.ExitApplication));
         _trayController.FailureReported += message =>

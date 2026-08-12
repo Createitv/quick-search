@@ -12,6 +12,7 @@ public partial class QuickLauncherWindow : Window, IDisposable
     private readonly QuickLauncherViewModel _viewModel;
     private bool _allowClose;
     private bool _openingSettings;
+    private bool _hideWhenDeactivated = true;
 
     public QuickLauncherWindow(QuickLauncherViewModel viewModel)
     {
@@ -25,9 +26,10 @@ public partial class QuickLauncherWindow : Window, IDisposable
 
     public event EventHandler? SettingsRequested;
 
-    public void ShowLauncher()
+    public void ShowLauncher(bool hideWhenDeactivated = true)
     {
         _openingSettings = false;
+        _hideWhenDeactivated = hideWhenDeactivated;
         _viewModel.Reset();
         var workArea = SystemParameters.WorkArea;
         Left = workArea.Left + Math.Max(16, (workArea.Width - Width) / 2);
@@ -101,7 +103,7 @@ public partial class QuickLauncherWindow : Window, IDisposable
 
     private void Window_Deactivated(object? sender, EventArgs e)
     {
-        if (!_openingSettings)
+        if (_hideWhenDeactivated && !_openingSettings)
         {
             Hide();
         }
