@@ -65,12 +65,64 @@
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
           </Grid.RowDefinitions>
-          <Border Style="{StaticResource SurfaceCardStyle}" Padding="15,13">
+          <Border Margin="0,0,0,12"
+                  Padding="16,14"
+                  Background="{DynamicResource SoftBlueBrush}"
+                  BorderBrush="{DynamicResource RouteBlueBrush}"
+                  BorderThickness="1"
+                  CornerRadius="8">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <DataTrigger Binding="{Binding Bootstrap.IsBootstrapPanelVisible, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Value="True">
+                    <Setter Property="Visibility" Value="Visible" />
+                  </DataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel Margin="0,0,20,0">
+                <TextBlock Text="{Binding Bootstrap.PanelTitle, RelativeSource={RelativeSource AncestorType=Window}}"
+                           FontSize="15"
+                           FontWeight="SemiBold" />
+                <TextBlock Margin="0,5,0,0"
+                           Text="{Binding Bootstrap.StatusText, RelativeSource={RelativeSource AncestorType=Window}}"
+                           TextWrapping="Wrap"
+                           Style="{StaticResource SecondaryTextStyle}" />
+              </StackPanel>
+              <Button Grid.Column="1"
+                      MinWidth="132"
+                      VerticalAlignment="Center"
+                      Content="{Binding Bootstrap.InstallButtonText, RelativeSource={RelativeSource AncestorType=Window}}"
+                      Command="{Binding Bootstrap.InstallCommand, RelativeSource={RelativeSource AncestorType=Window}}">
+                <Button.Style>
+                  <Style TargetType="Button" BasedOn="{StaticResource PrimaryButtonStyle}">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                      <DataTrigger Binding="{Binding Bootstrap.IsInstallActionVisible, RelativeSource={RelativeSource AncestorType=Window}}"
+                                   Value="True">
+                        <Setter Property="Visibility" Value="Visible" />
+                      </DataTrigger>
+                    </Style.Triggers>
+                  </Style>
+                </Button.Style>
+              </Button>
+            </Grid>
+          </Border>
+          <Border Grid.Row="1" Style="{StaticResource SurfaceCardStyle}" Padding="15,13">
             <StackPanel>
               <TextBlock Text="搜索文件夹" Style="{StaticResource FieldLabelStyle}" />
               <TextBox x:Name="SearchBox"
                        AutomationProperties.Name="搜索文件夹"
+                       IsEnabled="{Binding Bootstrap.CanSearch, RelativeSource={RelativeSource AncestorType=Window}}"
                        FontSize="17"
                        Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}">
                 <TextBox.InputBindings>
@@ -84,7 +136,7 @@
                          Style="{StaticResource SecondaryTextStyle}" />
             </StackPanel>
           </Border>
-          <Grid Grid.Row="1" Margin="14,-1,14,0">
+          <Grid Grid.Row="2" Margin="14,-1,14,0">
             <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5">
               <Rectangle.Fill>
                 <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
@@ -161,6 +213,7 @@
                        Style="{StaticResource SecondaryTextStyle}" />
           </Grid>
           <ListBox Grid.Row="1"
+                   IsEnabled="{Binding Bootstrap.CanSearch, RelativeSource={RelativeSource AncestorType=Window}}"
                    ItemsSource="{Binding Results}"
                    SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
                    ItemContainerStyle="{StaticResource ResultListItemStyle}">
@@ -205,6 +258,7 @@
           </StackPanel>
           <Button Grid.Column="1"
                   Content="打开选中文件夹  →"
+                  IsEnabled="{Binding Bootstrap.CanSearch, RelativeSource={RelativeSource AncestorType=Window}}"
                   IsDefault="True"
                   Style="{StaticResource PrimaryButtonStyle}"
                   Command="{Binding OpenSelectedCommand}" />

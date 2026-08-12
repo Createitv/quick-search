@@ -52,7 +52,10 @@ public partial class App : System.Windows.Application
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "QuickSearch");
         var store = new JsonMappingStore(Path.Combine(configDirectory, "config.json"));
-        var search = new EverythingFolderSearch(new EverythingNativeAdapter());
+        var native = new EverythingNativeAdapter();
+        var search = new EverythingFolderSearch(native);
+        var bootstrap = new EverythingBootstrapViewModel(
+            new EverythingInstallationManager(native, AppContext.BaseDirectory));
         var startup = new StartupRegistration();
         var launcherViewModel = new LauncherViewModel(
             store,
@@ -63,10 +66,12 @@ public partial class App : System.Windows.Application
             launcherViewModel,
             store,
             search,
-            startup);
+            startup,
+            bootstrap);
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();
+        await bootstrap.InitializeAsync();
 
         var activationController = new SingleInstanceActivationController(_singleInstance);
         var primaryResult = activationController.Start(
@@ -78,7 +83,11 @@ public partial class App : System.Windows.Application
         }
 
         InitializeTray();
-        if (!backgroundRequested)
+        if (!bootstrap.CanSearch)
+        {
+            _mainWindow.ShowLauncher();
+        }
+        else if (!backgroundRequested)
         {
             await _mainWindow.ActivateFromClipboardAsync();
         }

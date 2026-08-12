@@ -10,6 +10,7 @@ public partial class MainWindow : Window, IDisposable
     private readonly IMappingStore _store;
     private readonly IFolderSearch _search;
     private readonly IStartupRegistration _startup;
+    private readonly EverythingBootstrapViewModel _bootstrap;
     private IHotkeyRegistration? _hotkey;
     private GlobalHotkey? _globalHotkey;
     private string? _hotkeyInitializationFailure;
@@ -21,22 +22,27 @@ public partial class MainWindow : Window, IDisposable
         LauncherViewModel viewModel,
         IMappingStore store,
         IFolderSearch search,
-        IStartupRegistration startup)
+        IStartupRegistration startup,
+        EverythingBootstrapViewModel bootstrap)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(search);
         ArgumentNullException.ThrowIfNull(startup);
+        ArgumentNullException.ThrowIfNull(bootstrap);
         _viewModel = viewModel;
         _store = store;
         _search = search;
         _startup = startup;
+        _bootstrap = bootstrap;
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;
         _viewModel.ShowSettingsRequested += ViewModel_ShowSettingsRequested;
         SourceInitialized += MainWindow_SourceInitialized;
     }
+
+    public EverythingBootstrapViewModel Bootstrap => _bootstrap;
 
     public async Task InitializeAsync()
     {
@@ -46,6 +52,12 @@ public partial class MainWindow : Window, IDisposable
 
     public async Task ActivateFromClipboardAsync()
     {
+        if (!_bootstrap.CanSearch)
+        {
+            ShowLauncher();
+            return;
+        }
+
         var disposition = await _viewModel.ActivateFromClipboardAsync();
         if (disposition == LauncherActivationDisposition.ShowLauncher)
         {

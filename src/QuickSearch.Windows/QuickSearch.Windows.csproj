@@ -27,4 +27,14 @@
              CopyToOutputDirectory="PreserveNewest"
              CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup Condition="Exists('dependencies\Everything-Setup.exe') And Exists('dependencies\Everything-Setup.sha256')">
+    <Content Include="dependencies\Everything-Setup.exe"
+             Link="dependencies\Everything-Setup.exe"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="dependencies\Everything-Setup.sha256"
+             Link="dependencies\Everything-Setup.sha256"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

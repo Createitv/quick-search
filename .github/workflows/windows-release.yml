@@ -20,6 +20,8 @@ jobs:
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
+      EVERYTHING_VERSION: 1.4.1.1032
+      EVERYTHING_INSTALLER_SHA256: c42efad041d4c0bb4d4ac97ae7cbe89f153ec1fe078772392e749c7f5d5282d3
     steps:
       - uses: actions/checkout@v6
 
@@ -52,6 +54,20 @@ jobs:
           New-Item -ItemType Directory -Force src/QuickSearch.Windows/native | Out-Null
           Copy-Item Everything-SDK/dll/Everything64.dll src/QuickSearch.Windows/native/Everything64.dll
 
+      - name: Download and verify official Everything x64 installer
+        shell: pwsh
+        run: |
+          $fileName = "Everything-$env:EVERYTHING_VERSION.x64-Setup.exe"
+          Invoke-WebRequest "https://www.voidtools.com/$fileName" -OutFile $fileName
+          $actual = (Get-FileHash $fileName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:EVERYTHING_INSTALLER_SHA256) {
+            throw "Everything installer SHA-256 mismatch: $actual"
+          }
+          $dependencies = 'src/QuickSearch.Windows/dependencies'
+          New-Item -ItemType Directory -Force $dependencies | Out-Null
+          Copy-Item $fileName "$dependencies/Everything-Setup.exe"
+          Set-Content "$dependencies/Everything-Setup.sha256" $actual -NoNewline
+
       - name: Restore
         run: dotnet restore QuickSearch.sln
 
@@ -67,7 +83,9 @@ jobs:
           $required = @(
             'artifacts/publish/QuickSearch.exe',
             'artifacts/publish/Everything64.dll',
-            'artifacts/publish/QuickSearch.Core.dll'
+            'artifacts/publish/QuickSearch.Core.dll',
+            'artifacts/publish/dependencies/Everything-Setup.exe',
+            'artifacts/publish/dependencies/Everything-Setup.sha256'
           )
           foreach ($path in $required) {
             if (-not (Test-Path $path)) { throw "Missing publish output: $path" }

@@ -30,7 +30,9 @@ SetupIconFile=..\src\QuickSearch.Windows\Assets\QuickSearch.ico
 WizardStyle=modern
 
 [Files]
-Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\*"; DestDir: "{app}"; Excludes: "dependencies\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PublishDir}\dependencies\Everything-Setup.exe"; DestDir: "{app}\dependencies"; Flags: ignoreversion
+Source: "{#PublishDir}\dependencies\Everything-Setup.sha256"; DestDir: "{app}\dependencies"; Flags: ignoreversion
 Source: "..\THIRD-PARTY-NOTICES.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
