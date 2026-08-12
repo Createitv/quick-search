@@ -2,226 +2,122 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
-        Title="QuickSearch 设置" Icon="Assets/QuickSearch.ico" Width="760" Height="680"
-        MinWidth="640" MinHeight="560"
-        WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False"
-        Closing="Window_Closing">
-  <Window.InputBindings>
-    <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
-  </Window.InputBindings>
+        Title="设置" Icon="Assets/QuickSearch.ico" Width="920" Height="700"
+        MinWidth="760" MinHeight="580" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False" Closing="Window_Closing">
+  <Window.Resources>
+    <HierarchicalDataTemplate DataType="{x:Type core:NavigationFolderNodeViewModel}" ItemsSource="{Binding Children}">
+      <Button Style="{StaticResource ExplorerTreeItemStyle}" Content="{Binding Name}"
+              Command="{Binding DataContext.Organizer.SelectFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+              CommandParameter="{Binding Folder}" />
+    </HierarchicalDataTemplate>
+  </Window.Resources>
+  <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CancelCommand}" /></Window.InputBindings>
 
-  <Grid Margin="24">
-    <Border Background="{DynamicResource PaperBrush}"
-            CornerRadius="16"
-            Padding="24">
-      <Border.Effect>
-        <DropShadowEffect BlurRadius="22"
-                          Direction="270"
-                          ShadowDepth="5"
-                          Color="#27364F"
-                          Opacity="0.12" />
-      </Border.Effect>
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="*" />
-          <RowDefinition Height="Auto" />
-          <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
+  <Grid Background="{DynamicResource PaperBrush}">
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Border Padding="24,18" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+      <StackPanel>
+        <TextBlock Text="设置" Style="{StaticResource WindowTitleStyle}" />
+        <TextBlock Margin="0,3,0,0" Text="通用选项、分类层级和快速打开规则" Style="{StaticResource SecondaryTextStyle}" />
+      </StackPanel>
+    </Border>
 
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-          <TextBlock Text="设置" Style="{StaticResource WindowTitleStyle}" />
-          <TextBlock Margin="0,4,0,0"
-                     Text="管理启动方式、快捷键和关键词映射"
-                     Style="{StaticResource SecondaryTextStyle}" />
-        </StackPanel>
+    <TabControl Grid.Row="1" Margin="20,16,20,0">
+      <TabItem Header="通用">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="12,18">
+            <TextBlock Text="Everything" Style="{StaticResource SectionTitleStyle}" />
+            <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
+              <StackPanel Orientation="Horizontal">
+                <Ellipse Width="8" Height="8" Margin="0,0,9,0" Fill="{DynamicResource SignalCyanBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding EverythingHealthText}" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <TextBlock Text="全局快捷键" Style="{StaticResource FieldLabelStyle}" />
+            <TextBox Width="300" HorizontalAlignment="Left" Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Margin="2,6,0,20" Text="复制关键词后按此快捷键，可直接打开所有匹配规则。" Style="{StaticResource SecondaryTextStyle}" />
+            <CheckBox Content="登录 Windows 后自动启动" IsChecked="{Binding StartWithWindows}" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
 
-        <ScrollViewer Grid.Row="1" Grid.RowSpan="3"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-          <Grid Margin="0,0,8,0">
-            <Grid.RowDefinitions>
-              <RowDefinition Height="Auto" />
-              <RowDefinition Height="*" />
-              <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
-        <StackPanel Grid.Row="0" Margin="0,0,0,20">
-          <TextBlock Text="通用" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,10" />
-          <Border Style="{StaticResource SurfaceCardStyle}">
+      <TabItem Header="分类与规则">
+        <Grid Margin="8,14,8,8">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="270" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+          <Border Grid.Column="0" Style="{StaticResource SurfaceCardStyle}" Padding="12">
             <Grid>
-              <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-              </Grid.RowDefinitions>
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Text="Everything 状态"
-                           Style="{StaticResource FieldLabelStyle}"
-                           Margin="0"
-                           VerticalAlignment="Center" />
-                <Border Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Top">
-                  <Border.Style>
-                    <Style TargetType="Border" BasedOn="{StaticResource PillStyle}">
-                      <Setter Property="Background" Value="{DynamicResource SoftErrorBrush}" />
-                      <Style.Triggers>
-                        <DataTrigger Binding="{Binding EverythingHealth}" Value="{x:Static core:EverythingHealth.Ready}">
-                          <Setter Property="Background" Value="{DynamicResource SoftCyanBrush}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding EverythingHealth}" Value="{x:Static core:EverythingHealth.NotReady}">
-                          <Setter Property="Background" Value="{DynamicResource SoftBlueBrush}" />
-                        </DataTrigger>
-                      </Style.Triggers>
-                    </Style>
-                  </Border.Style>
-                  <StackPanel Orientation="Horizontal">
-                    <Ellipse Width="7" Height="7" Margin="0,0,7,0" VerticalAlignment="Center">
-                      <Ellipse.Style>
-                        <Style TargetType="Ellipse">
-                          <Setter Property="Fill" Value="{DynamicResource ErrorBrush}" />
-                          <Style.Triggers>
-                            <DataTrigger Binding="{Binding EverythingHealth}" Value="{x:Static core:EverythingHealth.Ready}">
-                              <Setter Property="Fill" Value="{DynamicResource SignalCyanBrush}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding EverythingHealth}" Value="{x:Static core:EverythingHealth.NotReady}">
-                              <Setter Property="Fill" Value="{DynamicResource RouteBlueBrush}" />
-                            </DataTrigger>
-                          </Style.Triggers>
-                        </Style>
-                      </Ellipse.Style>
-                    </Ellipse>
-                    <TextBlock MaxWidth="360"
-                               Text="{Binding EverythingHealthText}"
-                               TextWrapping="Wrap"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource SlateBrush}" />
-                  </StackPanel>
-                </Border>
+              <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+              <TextBlock Text="分类文件夹" Style="{StaticResource SectionTitleStyle}" Margin="4,2,0,10" />
+              <TreeView Grid.Row="1" ItemsSource="{Binding Organizer.RootFolders}" BorderThickness="0" Background="Transparent"
+                        ItemContainerStyle="{StaticResource ExplorerTreeViewItemStyle}" />
+              <Grid Grid.Row="2" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBox MinHeight="36" Padding="9,6" Text="{Binding Organizer.NewFolderName, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="新建子级" Command="{Binding Organizer.AddFolderCommand}" />
               </Grid>
-              <Grid Grid.Row="1" Margin="0,18,0,0">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="5*" />
-                  <ColumnDefinition Width="24" />
-                  <ColumnDefinition Width="4*" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                  <TextBlock Text="全局快捷键" Style="{StaticResource FieldLabelStyle}" />
-                  <TextBox AutomationProperties.Name="全局快捷键"
-                           Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
-                  <TextBlock Margin="2,6,0,0"
-                             Text="例如 Ctrl+Alt+F"
-                             Style="{StaticResource SecondaryTextStyle}" />
+              <StackPanel Grid.Row="3" Margin="0,9,0,0">
+                <Grid>
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <TextBox MinHeight="36" Padding="9,6" Text="{Binding Organizer.RenameFolderName, UpdateSourceTrigger=PropertyChanged}" />
+                  <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="重命名" Command="{Binding Organizer.RenameFolderCommand}" />
+                </Grid>
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <ComboBox ItemsSource="{Binding Organizer.Folders}" DisplayMemberPath="Name" SelectedItem="{Binding Organizer.MoveTargetFolder, Mode=TwoWay}" />
+                  <Button Grid.Column="1" Margin="7,0,0,0" Padding="10,6" Content="移动到" Command="{Binding Organizer.MoveSelectedFolderCommand}" />
+                </Grid>
+                <Button Margin="0,8,0,0" Padding="10,6" Content="删除当前分类…" Style="{StaticResource QuietButtonStyle}" Click="DeleteFolder_Click" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Column="2" Style="{StaticResource SurfaceCardStyle}" Padding="14">
+            <Grid>
+              <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+              <Grid Margin="0,0,0,10">
+                <StackPanel>
+                  <TextBlock Text="{Binding Organizer.SelectedFolder.Name, TargetNullValue=请选择分类}" Style="{StaticResource SectionTitleStyle}" />
+                  <TextBlock Margin="0,3,0,0" Text="每条规则对应一个真实文件夹，可设置多个关键词" Style="{StaticResource SecondaryTextStyle}" />
                 </StackPanel>
-                <Border Grid.Column="1" Width="1" Background="{DynamicResource LineBrush}" />
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                  <TextBlock Text="启动" Style="{StaticResource FieldLabelStyle}" />
-                  <CheckBox Margin="0,5,0,0"
-                            AutomationProperties.Name="登录 Windows 后自动启动"
-                            Content="登录 Windows 后自动启动"
-                            IsChecked="{Binding StartWithWindows}" />
+                <Button HorizontalAlignment="Right" Content="删除所选规则" Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.DeleteRuleCommand}" />
+              </Grid>
+              <DataGrid Grid.Row="1" ItemsSource="{Binding Organizer.CurrentRules}" SelectedItem="{Binding Organizer.SelectedRule, Mode=TwoWay}"
+                        AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                        BorderBrush="{DynamicResource LineBrush}" BorderThickness="1">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Header="标题" Width="1.4*" Binding="{Binding Title, UpdateSourceTrigger=PropertyChanged}" />
+                  <DataGridTextColumn Header="关键词（逗号分隔）" Width="1.8*" Binding="{Binding Keywords, UpdateSourceTrigger=PropertyChanged}" />
+                  <DataGridTextColumn Header="真实文件夹路径" Width="3*" Binding="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
+                </DataGrid.Columns>
+              </DataGrid>
+              <Grid Grid.Row="2" Margin="0,12,0,0">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="1.4*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="1.8*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="3*" /></Grid.ColumnDefinitions>
+                <TextBox MinHeight="36" Padding="9,6" Text="{Binding Organizer.NewRuleTitle, UpdateSourceTrigger=PropertyChanged}" ToolTip="规则标题（可选）" />
+                <TextBox Grid.Column="2" MinHeight="36" Padding="9,6" Text="{Binding Organizer.NewRuleKeywords, UpdateSourceTrigger=PropertyChanged}" ToolTip="关键词，逗号分隔" />
+                <TextBox Grid.Column="4" MinHeight="36" Padding="9,6" Text="{Binding Organizer.NewRulePath, UpdateSourceTrigger=PropertyChanged}" ToolTip="真实文件夹路径" />
+              </Grid>
+              <Grid Grid.Row="3" Margin="0,9,0,0">
+                <TextBlock Text="{Binding Organizer.Message}" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                  <Button Content="移动所选规则" Style="{StaticResource QuietButtonStyle}" Command="{Binding Organizer.MoveSelectedRuleCommand}" />
+                  <Button Margin="8,0,0,0" Content="＋ 新建规则" Command="{Binding Organizer.AddRuleCommand}" />
                 </StackPanel>
               </Grid>
             </Grid>
           </Border>
+        </Grid>
+      </TabItem>
+    </TabControl>
+
+    <Border Grid.Row="2" Margin="0,14,0,0" Padding="22,14" Background="{DynamicResource MutedSurfaceBrush}"
+            BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0">
+      <Grid>
+        <TextBlock Text="{Binding Message}" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" />
+        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+          <Button Content="取消" Style="{StaticResource QuietButtonStyle}" Command="{Binding CancelCommand}" />
+          <Button Margin="8,0,0,0" Content="保存更改" IsDefault="True" Style="{StaticResource PrimaryButtonStyle}" Command="{Binding SaveCommand}" />
         </StackPanel>
-
-        <Grid Grid.Row="1" MinHeight="240">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-          </Grid.RowDefinitions>
-          <Grid Margin="0,0,0,10">
-            <StackPanel>
-              <TextBlock Text="关键词映射" Style="{StaticResource SectionTitleStyle}" />
-              <TextBlock Margin="0,3,0,0"
-                         Text="修改在保存前不会生效"
-                         Style="{StaticResource SecondaryTextStyle}" />
-            </StackPanel>
-            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-              <Button Content="删除所选"
-                      Style="{StaticResource QuietButtonStyle}"
-                      Command="{Binding DeleteMappingCommand}" />
-              <Button Margin="8,0,0,0"
-                      Content="＋  新建映射"
-                      Command="{Binding AddMappingCommand}" />
-            </StackPanel>
-          </Grid>
-          <Grid Grid.Row="1" Margin="17,0,17,7">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="3*" />
-              <ColumnDefinition Width="16" />
-              <ColumnDefinition Width="7*" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="关键词" Style="{StaticResource FieldLabelStyle}" Margin="0" />
-            <TextBlock Grid.Column="2" Text="文件夹路径" Style="{StaticResource FieldLabelStyle}" Margin="0" />
-          </Grid>
-          <ListBox Grid.Row="2"
-                   ItemsSource="{Binding Mappings}"
-                   SelectedItem="{Binding SelectedMapping, Mode=TwoWay}"
-                   ItemContainerStyle="{StaticResource ResultListItemStyle}">
-            <ListBox.ItemTemplate>
-              <DataTemplate>
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3*" />
-                    <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="7*" />
-                  </Grid.ColumnDefinitions>
-                  <TextBox Grid.Column="0"
-                           AutomationProperties.Name="映射关键词"
-                           Text="{Binding Alias, UpdateSourceTrigger=PropertyChanged}" />
-                  <TextBox Grid.Column="2"
-                           AutomationProperties.Name="映射文件夹路径"
-                           Text="{Binding FolderPath, UpdateSourceTrigger=PropertyChanged}" />
-                </Grid>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-        </Grid>
-
-        <Border Grid.Row="2"
-                Margin="0,12,0,0"
-                Padding="12,9"
-                Background="{DynamicResource SoftErrorBrush}"
-                CornerRadius="10">
-          <Border.Style>
-            <Style TargetType="Border">
-              <Setter Property="Visibility" Value="Visible" />
-              <Style.Triggers>
-                <DataTrigger Binding="{Binding Message}" Value="">
-                  <Setter Property="Visibility" Value="Collapsed" />
-                </DataTrigger>
-              </Style.Triggers>
-            </Style>
-          </Border.Style>
-          <TextBlock Text="{Binding Message}"
-                     TextWrapping="Wrap"
-                     Foreground="{DynamicResource ErrorBrush}" />
-        </Border>
-          </Grid>
-        </ScrollViewer>
-
-        <Grid Grid.Row="4" Margin="0,16,0,0">
-          <TextBlock Text="Esc  取消并放弃未保存的修改"
-                     VerticalAlignment="Center"
-                     Style="{StaticResource SecondaryTextStyle}" />
-          <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-            <Button Content="取消"
-                    Style="{StaticResource QuietButtonStyle}"
-                    Command="{Binding CancelCommand}" />
-            <Button Margin="8,0,0,0"
-                    Content="保存更改"
-                    IsDefault="True"
-                    Style="{StaticResource PrimaryButtonStyle}"
-                    Command="{Binding SaveCommand}" />
-          </StackPanel>
-        </Grid>
       </Grid>
     </Border>
   </Grid>

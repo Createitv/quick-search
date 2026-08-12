@@ -10,6 +10,7 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
 {
     private AppConfiguration _candidate;
     private NavigationFolder? _selectedFolder;
+    private NavigationFolder? _moveTargetFolder;
     private FolderRuleEditorViewModel? _selectedRule;
     private IReadOnlyList<NavigationFolderNodeViewModel> _rootFolders = [];
     private IReadOnlyList<FolderRuleEditorViewModel> _currentRules = [];
@@ -19,16 +20,19 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
     private string _newRuleTitle = string.Empty;
     private string _newRuleKeywords = string.Empty;
     private string _newRulePath = string.Empty;
+    private string _message = string.Empty;
 
     public NavigationOrganizerViewModel(AppConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         _candidate = configuration.Clone();
         SelectFolderCommand = new RelayCommand<NavigationFolder>(folder => SelectFolder(folder.Id));
-        AddFolderCommand = new RelayCommand(AddFolderFromInput);
-        RenameFolderCommand = new RelayCommand(RenameSelectedFolderFromInput);
-        AddRuleCommand = new RelayCommand(AddRuleFromInput);
-        DeleteRuleCommand = new RelayCommand(DeleteSelectedRule, () => SelectedRule is not null);
+        AddFolderCommand = new RelayCommand(() => RunUiAction(AddFolderFromInput));
+        RenameFolderCommand = new RelayCommand(() => RunUiAction(RenameSelectedFolderFromInput));
+        AddRuleCommand = new RelayCommand(() => RunUiAction(AddRuleFromInput));
+        DeleteRuleCommand = new RelayCommand(() => RunUiAction(DeleteSelectedRule), () => SelectedRule is not null);
+        MoveSelectedFolderCommand = new RelayCommand(() => RunUiAction(MoveSelectedFolder));
+        MoveSelectedRuleCommand = new RelayCommand(() => RunUiAction(MoveSelectedRule), () => SelectedRule is not null);
         BeginEdit(configuration);
     }
 
@@ -63,8 +67,15 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
             if (SetProperty(ref _selectedRule, value))
             {
                 DeleteRuleCommand.NotifyCanExecuteChanged();
+                MoveSelectedRuleCommand.NotifyCanExecuteChanged();
             }
         }
+    }
+
+    public NavigationFolder? MoveTargetFolder
+    {
+        get => _moveTargetFolder;
+        set => SetProperty(ref _moveTargetFolder, value);
     }
 
     public IReadOnlyList<FolderRuleEditorViewModel> CurrentRules
@@ -103,6 +114,12 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
         set => SetProperty(ref _newRulePath, value ?? string.Empty);
     }
 
+    public string Message
+    {
+        get => _message;
+        private set => SetProperty(ref _message, value);
+    }
+
     public RelayCommand<NavigationFolder> SelectFolderCommand { get; }
 
     public RelayCommand AddFolderCommand { get; }
@@ -113,10 +130,15 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
 
     public RelayCommand DeleteRuleCommand { get; }
 
+    public RelayCommand MoveSelectedFolderCommand { get; }
+
+    public RelayCommand MoveSelectedRuleCommand { get; }
+
     public void BeginEdit(AppConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         _candidate = configuration.Clone();
+        Message = string.Empty;
         _editors = _candidate.Rules.Select(rule => new FolderRuleEditorViewModel(rule)).ToList();
         var selectedId = SelectedFolder?.Id;
         RefreshTree();
@@ -124,6 +146,7 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
             selectedId is Guid id && Folders.Any(folder => folder.Id == id)
                 ? id
                 : UncategorizedFolderId);
+        MoveTargetFolder = Folders.FirstOrDefault(folder => folder.Id == UncategorizedFolderId);
     }
 
     public AppConfiguration BuildCandidate()
@@ -230,6 +253,19 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
         NewFolderName = string.Empty;
     }
 
+    private void RunUiAction(Action action)
+    {
+        try
+        {
+            action();
+            Message = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            Message = exception.Message;
+        }
+    }
+
     private void RenameSelectedFolderFromInput()
     {
         if (SelectedFolder is not null)
@@ -269,6 +305,26 @@ public sealed class NavigationOrganizerViewModel : ObservableObject
         ReloadEditors();
         SelectedRule = null;
         RefreshCurrentRules();
+    }
+
+    private void MoveSelectedFolder()
+    {
+        if (SelectedFolder is null || MoveTargetFolder is null)
+        {
+            throw new InvalidOperationException("请选择目标分类。");
+        }
+
+        MoveFolder(SelectedFolder.Id, MoveTargetFolder.Id, 0);
+    }
+
+    private void MoveSelectedRule()
+    {
+        if (SelectedRule is null || MoveTargetFolder is null)
+        {
+            throw new InvalidOperationException("请选择规则和目标分类。");
+        }
+
+        MoveRules([SelectedRule.Id], MoveTargetFolder.Id);
     }
 
     private void CommitEditors()

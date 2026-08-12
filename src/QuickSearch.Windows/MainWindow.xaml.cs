@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Input;
 using QuickSearch.Core;
 
 namespace QuickSearch.Windows;
@@ -16,6 +17,8 @@ public partial class MainWindow : Window, IDisposable
     private string? _hotkeyInitializationFailure;
     private SettingsViewModel? _settingsViewModel;
     private SettingsWindow? _settingsWindow;
+    private Point _pinDragStart;
+    private NavigationFolder? _draggedPin;
     private bool _allowClose;
 
     public MainWindow(
@@ -203,6 +206,106 @@ public partial class MainWindow : Window, IDisposable
         _viewModel.RefreshConfiguration();
 
     private void Window_Activated(object sender, EventArgs e) => FocusSearch();
+
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.K && Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            FocusSearch();
+            e.Handled = true;
+        }
+    }
+
+    private void PinnedFolder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _pinDragStart = e.GetPosition(this);
+        _draggedPin = (sender as FrameworkElement)?.DataContext as NavigationFolder;
+    }
+
+    private void PinnedFolder_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _draggedPin is null)
+        {
+            return;
+        }
+
+        var current = e.GetPosition(this);
+        if (Math.Abs(current.X - _pinDragStart.X) < SystemParameters.MinimumHorizontalDragDistance
+            && Math.Abs(current.Y - _pinDragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        DragDrop.DoDragDrop((DependencyObject)sender, _draggedPin, DragDropEffects.Move);
+    }
+
+    private void PinnedFolder_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(NavigationFolder))
+            || e.Data.GetData(typeof(NavigationFolder)) is not NavigationFolder source
+            || (sender as FrameworkElement)?.DataContext is not NavigationFolder target)
+        {
+            return;
+        }
+
+        var targetIndex = _viewModel.Explorer.PinnedFolders
+            .Select((folder, index) => (folder, index))
+            .FirstOrDefault(item => item.folder.Id == target.Id)
+            .index;
+        _viewModel.Explorer.ReorderPinnedFolderCommand.Execute(
+            new PinMoveRequest(source.Id, targetIndex));
+        _draggedPin = null;
+        e.Handled = true;
+    }
+
+    private async void Folder_NewChild_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel node)
+        {
+            return;
+        }
+
+        var name = Microsoft.VisualBasic.Interaction.InputBox(
+            "输入子文件夹名称：",
+            "新建子文件夹");
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            await _viewModel.Explorer.CreateFolderAsync(node.Id, name);
+        }
+    }
+
+    private async void Folder_Rename_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not NavigationFolderNodeViewModel node)
+        {
+            return;
+        }
+
+        var name = Microsoft.VisualBasic.Interaction.InputBox(
+            "输入新名称：",
+            "重命名文件夹",
+            node.Name);
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            await _viewModel.Explorer.RenameFolderAsync(node.Id, name);
+        }
+    }
+
+    private void Folder_Pin_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is NavigationFolderNodeViewModel node)
+        {
+            _viewModel.Explorer.PinFolderCommand.Execute(node.Folder);
+        }
+    }
+
+    private void Folder_Unpin_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is NavigationFolderNodeViewModel node)
+        {
+            _viewModel.Explorer.UnpinFolderCommand.Execute(node.Folder);
+        }
+    }
 
     private void FocusSearch()
     {

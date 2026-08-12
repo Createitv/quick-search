@@ -249,4 +249,53 @@
       </Setter.Value>
     </Setter>
   </Style>
+
+  <Style x:Key="PinnedFolderButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+    <Setter Property="MinHeight" Value="38" />
+    <Setter Property="Padding" Value="14,7" />
+    <Setter Property="Background" Value="{DynamicResource MutedSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+  </Style>
+
+  <Style x:Key="ExplorerTreeItemStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+
+  <Style x:Key="ExplorerTreeViewItemStyle" TargetType="TreeViewItem">
+    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+    <Setter Property="Margin" Value="0,1" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FocusVisualStyle" Value="{StaticResource KeyboardFocusStyle}" />
+  </Style>
+
+  <Style x:Key="FolderCardButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+    <Setter Property="Height" Value="104" />
+    <Setter Property="Padding" Value="16,14" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="Background" Value="{DynamicResource MutedSurfaceBrush}" />
+  </Style>
+
+  <Style x:Key="RuleRowButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+    <Setter Property="Margin" Value="0,0,0,8" />
+    <Setter Property="Padding" Value="15,12" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Background" Value="{DynamicResource PaperBrush}" />
+  </Style>
+
+  <Style x:Key="BreadcrumbButtonStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="Padding" Value="5,3" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource SlateBrush}" />
+  </Style>
+
+  <Style x:Key="BottomGearButtonStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="Foreground" Value="{DynamicResource SlateBrush}" />
+  </Style>
 </ResourceDictionary>
