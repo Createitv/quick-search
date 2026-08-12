@@ -11,7 +11,9 @@ public sealed class NotifyIconAdapter : ITrayIcon
     public NotifyIconAdapter()
     {
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add("打开", null, (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add("打开文件夹管理器", null, (_, _) => OpenRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add("打开快速启动器", null, (_, _) => LauncherRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("设置", null, (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
         menu.Items.Add("退出", null, (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty));
         _notifyIcon = new Forms.NotifyIcon
@@ -24,6 +26,8 @@ public sealed class NotifyIconAdapter : ITrayIcon
     }
 
     public event EventHandler? OpenRequested;
+
+    public event EventHandler? LauncherRequested;
 
     public event EventHandler? SettingsRequested;
 

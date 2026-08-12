@@ -1,0 +1,173 @@
+namespace QuickSearch.Core.Tests;
+
+public sealed class QuickLauncherViewModelTests
+{
+    [Fact]
+    public async Task Search_MergesSavedShortcutsBeforeIndexedItemsAndAssignsFirstNineGestures()
+    {
+        var configuration = new AppConfiguration();
+        configuration.AddRule(
+            "项目资料",
+            ["project"],
+            @"C:\Work\Projects",
+            configuration.UncategorizedFolderId);
+        var indexed = Enumerable.Range(1, 10)
+            .Select(index => new QuickLauncherSearchItem(
+                $"project-{index}",
+                $@"C:\Indexed\project-{index}",
+                QuickLauncherItemKind.Folder))
+            .ToArray();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            new FakeQuickLauncherSearch(indexed),
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask);
+
+        viewModel.SearchText = "project";
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 11);
+
+        Assert.Equal(QuickLauncherItemKind.Shortcut, viewModel.Results[0].Kind);
+        Assert.Equal("Ctrl+1", viewModel.Results[0].ShortcutText);
+        Assert.Equal("Ctrl+9", viewModel.Results[8].ShortcutText);
+        Assert.Equal(string.Empty, viewModel.Results[9].ShortcutText);
+        Assert.Equal("项目资料", viewModel.SelectedResult?.Title);
+    }
+
+    [Fact]
+    public async Task OpenShortcutAsync_OpensNumberedResultAndRequestsHide()
+    {
+        var configuration = new AppConfiguration();
+        var opener = new FakePathOpener();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            new FakeQuickLauncherSearch(
+            [
+                new("one", @"C:\one", QuickLauncherItemKind.Folder),
+                new("two.exe", @"C:\two.exe", QuickLauncherItemKind.Application)
+            ]),
+            opener,
+            (_, _) => Task.CompletedTask);
+        var hidden = false;
+        viewModel.HideRequested += (_, _) => hidden = true;
+        viewModel.SearchText = "two";
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 2);
+
+        var opened = await viewModel.OpenShortcutAsync(2);
+
+        Assert.True(opened);
+        Assert.True(hidden);
+        Assert.Equal([@"C:\two.exe"], opener.OpenedPaths);
+    }
+
+    [Fact]
+    public async Task NewSearch_CancelsPreviousSearchAndKeepsLatestResults()
+    {
+        var configuration = new AppConfiguration();
+        var search = new DeferredQuickLauncherSearch();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            search,
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask);
+
+        viewModel.SearchText = "old";
+        var oldRequest = await search.WaitForRequestAsync("old");
+        viewModel.SearchText = "new";
+        var newRequest = await search.WaitForRequestAsync("new");
+        newRequest.Complete([new("new", @"C:\new", QuickLauncherItemKind.Folder)]);
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 1);
+
+        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
+        Assert.Equal("new", viewModel.Results[0].Title);
+    }
+
+    private static async Task EventuallyAsync(Func<bool> condition)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        while (!condition())
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                throw new TimeoutException("Condition was not reached.");
+            }
+
+            await Task.Delay(10);
+        }
+    }
+
+    private sealed class MemoryMappingStore(AppConfiguration configuration) : IMappingStore
+    {
+        public Task<AppConfiguration> LoadAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult(configuration.Clone());
+
+        public Task SaveAsync(
+            AppConfiguration candidate,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class FakeQuickLauncherSearch(
+        IReadOnlyList<QuickLauncherSearchItem> results) : IQuickLauncherSearch
+    {
+        public Task<IReadOnlyList<QuickLauncherSearchItem>> SearchLauncherAsync(
+            string query,
+            CancellationToken cancellationToken = default) => Task.FromResult(results);
+    }
+
+    private sealed class FakePathOpener : IPathOpener
+    {
+        public List<string> OpenedPaths { get; } = [];
+
+        public PlatformOperationResult Open(string path)
+        {
+            OpenedPaths.Add(path);
+            return PlatformOperationResult.Succeeded();
+        }
+    }
+
+    private sealed class DeferredQuickLauncherSearch : IQuickLauncherSearch
+    {
+        private readonly Dictionary<string, Request> _requests = [];
+
+        public Task<IReadOnlyList<QuickLauncherSearchItem>> SearchLauncherAsync(
+            string query,
+            CancellationToken cancellationToken = default)
+        {
+            var request = new Request(cancellationToken);
+            lock (_requests)
+            {
+                _requests.Add(query, request);
+            }
+
+            return request.Task;
+        }
+
+        public async Task<Request> WaitForRequestAsync(string query)
+        {
+            Request? request = null;
+            await EventuallyAsync(() =>
+            {
+                lock (_requests)
+                {
+                    return _requests.TryGetValue(query, out request);
+                }
+            });
+            return request!;
+        }
+
+        public sealed class Request(CancellationToken cancellationToken)
+        {
+            private readonly TaskCompletionSource<IReadOnlyList<QuickLauncherSearchItem>> _source =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public CancellationToken CancellationToken { get; } = cancellationToken;
+
+            public Task<IReadOnlyList<QuickLauncherSearchItem>> Task => _source.Task;
+
+            public void Complete(IReadOnlyList<QuickLauncherSearchItem> results) =>
+                _source.TrySetResult(results);
+        }
+    }
+}

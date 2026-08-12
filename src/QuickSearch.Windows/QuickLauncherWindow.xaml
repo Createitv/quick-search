@@ -1,0 +1,165 @@
+<Window x:Class="QuickSearch.Windows.QuickLauncherWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        Title="快速启动器" Width="640" Height="510"
+        MinWidth="520" MaxWidth="760"
+        WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        ShowInTaskbar="False" Topmost="True"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Deactivated="Window_Deactivated"
+        Closing="Window_Closing">
+  <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    <Style x:Key="LauncherResultItemStyle" TargetType="ListBoxItem">
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Border x:Name="Row" Padding="18,10" Background="{TemplateBinding Background}"
+                    CornerRadius="8" Margin="7,1">
+              <ContentPresenter />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="Row" Property="Background" Value="{DynamicResource SoftBlueBrush}" />
+              </Trigger>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Row" Property="Background" Value="{DynamicResource MutedSurfaceBrush}" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Window.Resources>
+
+  <Border Margin="14" Background="{DynamicResource PaperBrush}"
+          BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
+          CornerRadius="14">
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.24" Color="#334155" />
+    </Border.Effect>
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="76" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="42" />
+      </Grid.RowDefinitions>
+
+      <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
+              CornerRadius="14,14,0,0" Background="{DynamicResource PaperBrush}">
+        <Grid Margin="20,12,14,12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <ui:SymbolIcon Symbol="Search24" FontSize="25" Margin="2,0,13,0"
+                         Foreground="{DynamicResource RouteBlueBrush}" />
+          <TextBox x:Name="LauncherSearchBox" Grid.Column="1"
+                   FontFamily="{DynamicResource DisplayFont}" FontSize="22" FontWeight="Medium"
+                   Padding="0" MinHeight="42" BorderThickness="0" Background="Transparent"
+                   AutomationProperties.Name="搜索应用、文件、文件夹和快捷方式"
+                   Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+          <Border Grid.Column="2" Padding="8,4" CornerRadius="7"
+                  Background="{DynamicResource MutedSurfaceBrush}" VerticalAlignment="Center">
+            <TextBlock Text="Esc" FontSize="11" Foreground="{DynamicResource SlateBrush}" />
+          </Border>
+        </Grid>
+      </Border>
+
+      <Grid Grid.Row="1">
+        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Margin="30" TextAlignment="Center" TextWrapping="Wrap"
+                   Text="{Binding StatusText}">
+          <TextBlock.Style>
+            <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryTextStyle}">
+              <Setter Property="Visibility" Value="Visible" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding HasResults}" Value="True">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </TextBlock.Style>
+        </TextBlock>
+        <ListBox x:Name="ResultsList" ItemsSource="{Binding Results}"
+                 SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
+                 ItemContainerStyle="{StaticResource LauncherResultItemStyle}"
+                 MouseDoubleClick="ResultsList_MouseDoubleClick"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="42" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="34" Height="34" CornerRadius="8"
+                        Background="{DynamicResource SoftBlueBrush}" VerticalAlignment="Center">
+                  <ui:SymbolIcon FontSize="19" Foreground="{DynamicResource RouteBlueBrush}">
+                    <ui:SymbolIcon.Style>
+                      <Style TargetType="ui:SymbolIcon">
+                        <Setter Property="Symbol" Value="Document20" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Kind}" Value="{x:Static core:QuickLauncherItemKind.Shortcut}">
+                            <Setter Property="Symbol" Value="FolderLink20" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding Kind}" Value="{x:Static core:QuickLauncherItemKind.Folder}">
+                            <Setter Property="Symbol" Value="FolderOpen20" />
+                          </DataTrigger>
+                          <DataTrigger Binding="{Binding Kind}" Value="{x:Static core:QuickLauncherItemKind.Application}">
+                            <Setter Property="Symbol" Value="Apps20" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </ui:SymbolIcon.Style>
+                  </ui:SymbolIcon>
+                </Border>
+                <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                  <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"
+                             TextTrimming="CharacterEllipsis" />
+                  <TextBlock Margin="0,3,0,0" FontSize="11.5"
+                             Foreground="{DynamicResource SlateBrush}" TextTrimming="CharacterEllipsis">
+                    <Run Text="{Binding Detail, Mode=OneWay}" />
+                    <Run Text="  ·  " />
+                    <Run Text="{Binding FullPath, Mode=OneWay}" />
+                  </TextBlock>
+                </StackPanel>
+                <Border Grid.Column="2" Tag="{Binding ShortcutText}"
+                        Style="{StaticResource ShortcutBadgeStyle}">
+                  <TextBlock Text="{Binding ShortcutText}" FontSize="11" FontWeight="SemiBold"
+                             Foreground="{DynamicResource RouteBlueBrush}" />
+                </Border>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+
+      <Border Grid.Row="2" Padding="18,0,9,0" Background="{DynamicResource MutedSurfaceBrush}"
+              BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0"
+              CornerRadius="0,0,14,14">
+        <Grid>
+          <TextBlock Text="{Binding StatusText}" FontSize="11.5"
+                     Foreground="{DynamicResource SlateBrush}" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" />
+          <Button HorizontalAlignment="Right" Width="34" Height="32" Padding="0"
+                  ToolTip="启动器设置" Style="{StaticResource QuietButtonStyle}"
+                  Click="Settings_Click">
+            <ui:SymbolIcon Symbol="Settings20" FontSize="17" />
+          </Button>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

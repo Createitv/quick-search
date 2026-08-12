@@ -4,6 +4,8 @@ public interface ITrayIcon : IDisposable
 {
     event EventHandler? OpenRequested;
 
+    event EventHandler? LauncherRequested;
+
     event EventHandler? SettingsRequested;
 
     event EventHandler? ExitRequested;
@@ -15,6 +17,7 @@ public sealed class TrayIconController : IDisposable
 {
     private readonly ITrayIcon _trayIcon;
     private readonly Action _open;
+    private readonly Action _launcher;
     private readonly Action _settings;
     private readonly Action _exit;
     private bool _disposed;
@@ -22,18 +25,22 @@ public sealed class TrayIconController : IDisposable
     public TrayIconController(
         ITrayIcon trayIcon,
         Action open,
+        Action launcher,
         Action settings,
         Action exit)
     {
         ArgumentNullException.ThrowIfNull(trayIcon);
         ArgumentNullException.ThrowIfNull(open);
+        ArgumentNullException.ThrowIfNull(launcher);
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(exit);
         _trayIcon = trayIcon;
         _open = open;
+        _launcher = launcher;
         _settings = settings;
         _exit = exit;
         _trayIcon.OpenRequested += TrayIcon_OpenRequested;
+        _trayIcon.LauncherRequested += TrayIcon_LauncherRequested;
         _trayIcon.SettingsRequested += TrayIcon_SettingsRequested;
         _trayIcon.ExitRequested += TrayIcon_ExitRequested;
     }
@@ -71,6 +78,7 @@ public sealed class TrayIconController : IDisposable
 
         _disposed = true;
         _trayIcon.OpenRequested -= TrayIcon_OpenRequested;
+        _trayIcon.LauncherRequested -= TrayIcon_LauncherRequested;
         _trayIcon.SettingsRequested -= TrayIcon_SettingsRequested;
         _trayIcon.ExitRequested -= TrayIcon_ExitRequested;
         try
@@ -85,6 +93,9 @@ public sealed class TrayIconController : IDisposable
 
     private void TrayIcon_OpenRequested(object? sender, EventArgs e) =>
         InvokeBoundary(_open, "无法打开启动器");
+
+    private void TrayIcon_LauncherRequested(object? sender, EventArgs e) =>
+        InvokeBoundary(_launcher, "无法打开快速启动器");
 
     private void TrayIcon_SettingsRequested(object? sender, EventArgs e) =>
         InvokeBoundary(_settings, "无法打开设置");

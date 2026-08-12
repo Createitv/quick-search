@@ -9,7 +9,7 @@ public enum EverythingHealth
     QueryFailed
 }
 
-public sealed class EverythingFolderSearch : IFolderSearch
+public sealed class EverythingFolderSearch : IFolderSearch, IQuickLauncherSearch
 {
     public const uint RequestFileName = 0x00000001;
     public const uint RequestPath = 0x00000002;
@@ -37,6 +37,16 @@ public sealed class EverythingFolderSearch : IFolderSearch
             token => SearchOnWorker(query, token),
             cancellationToken);
         return (IReadOnlyList<FolderSearchResult>)result!;
+    }
+
+    public async Task<IReadOnlyList<QuickLauncherSearchItem>> SearchLauncherAsync(
+        string query,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await QueueAsync(
+            token => SearchLauncherOnWorker(query, token),
+            cancellationToken);
+        return (IReadOnlyList<QuickLauncherSearchItem>)result!;
     }
 
     public async Task ProbeAsync(CancellationToken cancellationToken = default)
@@ -153,6 +163,78 @@ public sealed class EverythingFolderSearch : IFolderSearch
             SetPlatformFailure(exception);
             return [];
         }
+    }
+
+    private IReadOnlyList<QuickLauncherSearchItem> SearchLauncherOnWorker(
+        string query,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!ProbeOnWorker())
+        {
+            return [];
+        }
+
+        try
+        {
+            _native.SetSearch(EverythingQueryBuilder.BuildLauncher(query));
+            _native.SetRequestFlags(RequestFileName | RequestPath);
+            _native.SetMax(60);
+            if (!_native.Query(wait: true))
+            {
+                var error = _native.GetLastError();
+                Health = ClassifyNativeError(error);
+                FailureMessage = Health == EverythingHealth.QueryFailed
+                    ? $"Everything 查询失败（错误 {error}）。"
+                    : null;
+                return [];
+            }
+
+            var results = new List<QuickLauncherSearchItem>();
+            var count = Math.Min(_native.GetNumResults(), 60u);
+            for (uint index = 0; index < count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var name = _native.GetResultFileName(index);
+                var parent = _native.GetResultPath(index);
+                if (string.IsNullOrWhiteSpace(name) || parent is null)
+                {
+                    continue;
+                }
+
+                var fullPath = Path.Combine(parent, name);
+                results.Add(new QuickLauncherSearchItem(
+                    name,
+                    fullPath,
+                    ClassifyLauncherItem(name, _native.IsFolderResult(index))));
+            }
+
+            Health = EverythingHealth.Ready;
+            FailureMessage = null;
+            return results;
+        }
+        catch (Exception exception) when (
+            exception is not OperationCanceledException and not ArgumentException)
+        {
+            SetPlatformFailure(exception);
+            return [];
+        }
+    }
+
+    private static QuickLauncherItemKind ClassifyLauncherItem(string name, bool isFolder)
+    {
+        if (isFolder)
+        {
+            return QuickLauncherItemKind.Folder;
+        }
+
+        var extension = Path.GetExtension(name);
+        return extension.Equals(".exe", StringComparison.OrdinalIgnoreCase)
+               || extension.Equals(".lnk", StringComparison.OrdinalIgnoreCase)
+               || extension.Equals(".url", StringComparison.OrdinalIgnoreCase)
+               || extension.Equals(".appref-ms", StringComparison.OrdinalIgnoreCase)
+            ? QuickLauncherItemKind.Application
+            : QuickLauncherItemKind.File;
     }
 
     private bool ProbeOnWorker()

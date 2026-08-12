@@ -10,6 +10,11 @@ public interface IFolderOpener
     PlatformOperationResult Open(string folderPath);
 }
 
+public interface IPathOpener
+{
+    PlatformOperationResult Open(string path);
+}
+
 public interface IStartupRegistration
 {
     PlatformOperationResult SetEnabled(bool enabled);

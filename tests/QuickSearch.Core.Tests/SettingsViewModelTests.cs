@@ -116,6 +116,54 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_PersistsAndRegistersIndependentLauncherShortcut()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var folderHotkey = new FakeHotkeyRegistration("Ctrl+Alt+F");
+        var launcherHotkey = new FakeHotkeyRegistration("Ctrl+Alt+Space");
+        var viewModel = new SettingsViewModel(
+            configuration,
+            store,
+            folderHotkey,
+            new FakeStartupRegistration(true),
+            new FakeFolderSearch(),
+            launcherHotkey: launcherHotkey)
+        {
+            LauncherShortcut = "Ctrl+Shift+Space"
+        };
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal("Ctrl+Shift+Space", configuration.Settings.QuickLauncherShortcut);
+        Assert.Equal("Ctrl+Shift+Space", launcherHotkey.ActiveShortcut);
+        Assert.Equal("Ctrl+Alt+F", folderHotkey.ActiveShortcut);
+        Assert.Equal(1, store.SaveCalls);
+    }
+
+    [Fact]
+    public async Task SaveAsync_RejectsMatchingFolderAndLauncherShortcuts()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var viewModel = new SettingsViewModel(
+            configuration,
+            store,
+            new FakeHotkeyRegistration("Ctrl+Alt+F"),
+            new FakeStartupRegistration(true),
+            new FakeFolderSearch(),
+            launcherHotkey: new FakeHotkeyRegistration("Ctrl+Alt+Space"))
+        {
+            LauncherShortcut = "Ctrl+Alt+F"
+        };
+
+        await viewModel.SaveAsync();
+
+        Assert.Contains("不能相同", viewModel.Message);
+        Assert.Equal(0, store.SaveCalls);
+    }
+
+    [Fact]
     public void Cancel_DiscardsAllPendingSettingsAndMappingChanges()
     {
         var configuration = CreateConfiguration();

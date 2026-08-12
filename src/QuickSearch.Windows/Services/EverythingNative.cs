@@ -23,6 +23,8 @@ internal sealed partial class EverythingNativeAdapter : IEverythingNative
     public string? GetResultPath(uint index) =>
         Marshal.PtrToStringUni(EverythingGetResultPath(index));
 
+    public bool IsFolderResult(uint index) => EverythingIsFolderResult(index);
+
     public uint GetLastError() => EverythingGetLastError();
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_SetSearchW", StringMarshalling = StringMarshalling.Utf16)]
@@ -46,6 +48,10 @@ internal sealed partial class EverythingNativeAdapter : IEverythingNative
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_GetResultPathW")]
     private static partial nint EverythingGetResultPath(uint index);
+
+    [LibraryImport("Everything64.dll", EntryPoint = "Everything_IsFolderResult")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool EverythingIsFolderResult(uint index);
 
     [LibraryImport("Everything64.dll", EntryPoint = "Everything_IsDBLoaded")]
     [return: MarshalAs(UnmanagedType.Bool)]

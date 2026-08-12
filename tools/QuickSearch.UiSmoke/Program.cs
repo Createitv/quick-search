@@ -36,6 +36,21 @@ internal static class Program
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
             mainWindow.Show();
             mainWindow.UpdateLayout();
+            mainWindow.ShowQuickLauncher();
+            application.Dispatcher.Invoke(
+                () => { },
+                DispatcherPriority.Render);
+            var launcherWindow = application.Windows
+                .OfType<QuickLauncherWindow>()
+                .SingleOrDefault();
+            if (launcherWindow is null || !launcherWindow.IsVisible)
+            {
+                Console.Error.WriteLine("Quick launcher window did not become visible.");
+                return 2;
+            }
+
+            launcherWindow.UpdateLayout();
+            launcherWindow.Hide();
             launcher.ShowSettingsCommand.Execute(null);
             application.Dispatcher.Invoke(
                 () => { },

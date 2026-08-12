@@ -85,13 +85,16 @@ public partial class App : System.Windows.Application
             search,
             new ClipboardTextReader(),
             new ExplorerFolderOpener());
+        var pathOpener = new ShellPathOpener();
         _mainWindow = new MainWindow(
             launcherViewModel,
             store,
             search,
             startup,
             bootstrap,
-            update);
+            update,
+            search,
+            pathOpener);
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();
@@ -157,6 +160,7 @@ public partial class App : System.Windows.Application
         _trayController = new TrayIconController(
             trayResult.Value,
             () => Dispatcher.Invoke(_mainWindow.ShowLauncher),
+            () => Dispatcher.Invoke(_mainWindow.ShowQuickLauncher),
             () => Dispatcher.Invoke(_mainWindow.ShowSettings),
             () => Dispatcher.Invoke(_mainWindow.ExitApplication));
         _trayController.FailureReported += message =>

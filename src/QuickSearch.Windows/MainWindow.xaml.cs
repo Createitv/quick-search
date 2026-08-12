@@ -25,9 +25,13 @@ public partial class MainWindow : Window, IDisposable
     private readonly ApplicationUpdateViewModel _update;
     private IHotkeyRegistration? _hotkey;
     private GlobalHotkey? _globalHotkey;
+    private IHotkeyRegistration? _launcherHotkey;
+    private GlobalHotkey? _globalLauncherHotkey;
     private string? _hotkeyInitializationFailure;
     private SettingsViewModel? _settingsViewModel;
     private SettingsWindow? _settingsWindow;
+    private readonly QuickLauncherViewModel _quickLauncherViewModel;
+    private QuickLauncherWindow? _quickLauncherWindow;
     private Point _pinDragStart;
     private NavigationFolder? _draggedPin;
     private Point _ruleDragStart;
@@ -40,7 +44,9 @@ public partial class MainWindow : Window, IDisposable
         IFolderSearch search,
         IStartupRegistration startup,
         EverythingBootstrapViewModel bootstrap,
-        ApplicationUpdateViewModel update)
+        ApplicationUpdateViewModel update,
+        IQuickLauncherSearch? launcherSearch = null,
+        IPathOpener? pathOpener = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(store);
@@ -54,6 +60,11 @@ public partial class MainWindow : Window, IDisposable
         _startup = startup;
         _bootstrap = bootstrap;
         _update = update;
+        _quickLauncherViewModel = new QuickLauncherViewModel(
+            _viewModel.Configuration,
+            _store,
+            launcherSearch ?? new EmptyQuickLauncherSearch(),
+            pathOpener ?? new UnavailablePathOpener());
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;
@@ -128,14 +139,23 @@ public partial class MainWindow : Window, IDisposable
 
         if (_settingsWindow is null)
         {
+            if (_launcherHotkey is null)
+            {
+                _launcherHotkey = new UnavailableHotkeyRegistration(
+                    _viewModel.Configuration.Settings.QuickLauncherShortcut,
+                    _hotkeyInitializationFailure ?? "启动器快捷键服务尚未就绪。");
+            }
+
             _settingsViewModel = new SettingsViewModel(
                 _viewModel.Configuration,
                 _store,
                 _hotkey,
                 _startup,
                 _search,
-                _update);
+                _update,
+                _launcherHotkey);
             _settingsViewModel.Saved += SettingsViewModel_Saved;
+            _settingsViewModel.QuickLauncherRequested += SettingsViewModel_QuickLauncherRequested;
             _settingsWindow = new SettingsWindow(_settingsViewModel)
             {
                 Owner = this
@@ -148,12 +168,24 @@ public partial class MainWindow : Window, IDisposable
         _settingsWindow.Activate();
     }
 
+    public void ShowQuickLauncher()
+    {
+        if (_quickLauncherWindow is null)
+        {
+            _quickLauncherWindow = new QuickLauncherWindow(_quickLauncherViewModel);
+            _quickLauncherWindow.SettingsRequested += QuickLauncherWindow_SettingsRequested;
+        }
+
+        _quickLauncherWindow.ShowLauncher();
+    }
+
     public void ReportStatus(string message) => _viewModel.ReportStatus(message);
 
     public void ExitApplication()
     {
         _allowClose = true;
         _settingsWindow?.AllowApplicationExit();
+        _quickLauncherWindow?.AllowApplicationExit();
         Close();
         System.Windows.Application.Current.Shutdown();
     }
@@ -165,13 +197,26 @@ public partial class MainWindow : Window, IDisposable
         if (_settingsViewModel is not null)
         {
             _settingsViewModel.Saved -= SettingsViewModel_Saved;
+            _settingsViewModel.QuickLauncherRequested -= SettingsViewModel_QuickLauncherRequested;
         }
 
         _settingsWindow?.AllowApplicationExit();
+        if (_quickLauncherWindow is not null)
+        {
+            _quickLauncherWindow.SettingsRequested -= QuickLauncherWindow_SettingsRequested;
+            _quickLauncherWindow.AllowApplicationExit();
+            _quickLauncherWindow.Dispose();
+        }
         if (_globalHotkey is not null)
         {
             _globalHotkey.Pressed -= Hotkey_Pressed;
             _globalHotkey.Dispose();
+        }
+
+        if (_globalLauncherHotkey is not null)
+        {
+            _globalLauncherHotkey.Pressed -= LauncherHotkey_Pressed;
+            _globalLauncherHotkey.Dispose();
         }
 
         _viewModel.Dispose();
@@ -184,6 +229,9 @@ public partial class MainWindow : Window, IDisposable
             _globalHotkey = new GlobalHotkey(this);
             _globalHotkey.Pressed += Hotkey_Pressed;
             _hotkey = _globalHotkey;
+            _globalLauncherHotkey = new GlobalHotkey(this, 0x5150);
+            _globalLauncherHotkey.Pressed += LauncherHotkey_Pressed;
+            _launcherHotkey = _globalLauncherHotkey;
         }
         catch (Exception exception)
         {
@@ -229,10 +277,35 @@ public partial class MainWindow : Window, IDisposable
         {
             _viewModel.ReportStatus($"无法注册快捷键：{exception.Message}");
         }
+
+
+        if (_launcherHotkey is null)
+        {
+            _launcherHotkey = new UnavailableHotkeyRegistration(
+                _viewModel.Configuration.Settings.QuickLauncherShortcut,
+                _hotkeyInitializationFailure ?? "启动器快捷键服务尚未就绪。");
+            return;
+        }
+
+        try
+        {
+            var launcherHotkeyResult = _launcherHotkey.TryReplace(
+                _viewModel.Configuration.Settings.QuickLauncherShortcut);
+            if (!launcherHotkeyResult.Success)
+            {
+                _viewModel.ReportStatus(launcherHotkeyResult.Message);
+            }
+        }
+        catch (Exception exception)
+        {
+            _viewModel.ReportStatus($"无法注册启动器快捷键：{exception.Message}");
+        }
     }
 
     private async void Hotkey_Pressed(object? sender, EventArgs e) =>
         await ActivateFromClipboardAsync();
+
+    private void LauncherHotkey_Pressed(object? sender, EventArgs e) => ShowQuickLauncher();
 
     private void ViewModel_HideRequested(object? sender, EventArgs e) => Hide();
 
@@ -241,7 +314,40 @@ public partial class MainWindow : Window, IDisposable
     private void SettingsViewModel_Saved(object? sender, EventArgs e) =>
         _viewModel.RefreshConfiguration();
 
+    private void SettingsViewModel_QuickLauncherRequested(object? sender, EventArgs e)
+    {
+        _settingsWindow?.Hide();
+        ShowQuickLauncher();
+    }
+
+    private void QuickLauncherWindow_SettingsRequested(object? sender, EventArgs e) =>
+        ShowSettings();
+
     private void Window_Activated(object sender, EventArgs e) => FocusSearch();
+
+    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2)
+        {
+            ToggleMaximize();
+            return;
+        }
+
+        DragMove();
+    }
+
+    private void MinimizeWindow_Click(object sender, RoutedEventArgs e) =>
+        WindowState = WindowState.Minimized;
+
+    private void MaximizeWindow_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
+
+    private void CloseWindow_Click(object sender, RoutedEventArgs e) => Hide();
+
+    private void QuickLauncher_Click(object sender, RoutedEventArgs e) => ShowQuickLauncher();
+
+    private void ToggleMaximize() => WindowState = WindowState == WindowState.Maximized
+        ? WindowState.Normal
+        : WindowState.Maximized;
 
     private async void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -273,6 +379,20 @@ public partial class MainWindow : Window, IDisposable
         Key.D9 or Key.NumPad9 => 9,
         _ => null
     };
+
+    private sealed class EmptyQuickLauncherSearch : IQuickLauncherSearch
+    {
+        public Task<IReadOnlyList<QuickLauncherSearchItem>> SearchLauncherAsync(
+            string query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<QuickLauncherSearchItem>>([]);
+    }
+
+    private sealed class UnavailablePathOpener : IPathOpener
+    {
+        public PlatformOperationResult Open(string path) =>
+            PlatformOperationResult.Failed("启动器路径打开服务尚未就绪。");
+    }
 
     private void PinnedFolder_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

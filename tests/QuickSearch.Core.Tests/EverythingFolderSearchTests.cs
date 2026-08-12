@@ -35,6 +35,34 @@ public sealed class EverythingFolderSearchTests
     }
 
     [Fact]
+    public async Task SearchLauncherAsync_ReturnsFoldersApplicationsAndFilesWithoutFolderFilter()
+    {
+        var native = new FakeEverythingNative
+        {
+            Results =
+            [
+                ("Projects", @"C:\Work"),
+                ("Visual Studio Code.lnk", @"C:\ProgramData\Programs"),
+                ("notes.md", @"C:\Work")
+            ],
+            FolderResultIndexes = new HashSet<uint> { 0 }
+        };
+        var search = new EverythingFolderSearch(native);
+
+        var results = await search.SearchLauncherAsync("work");
+
+        Assert.Equal("nowildcards:\"work\"", Assert.Single(native.Searches));
+        Assert.Equal(60u, native.MaximumResults);
+        Assert.Equal(
+            [
+                QuickLauncherItemKind.Folder,
+                QuickLauncherItemKind.Application,
+                QuickLauncherItemKind.File
+            ],
+            results.Select(result => result.Kind));
+    }
+
+    [Fact]
     public async Task SearchAsync_RanksNativeResultsByMatchQuality()
     {
         var native = new FakeEverythingNative
@@ -359,6 +387,8 @@ public sealed class EverythingFolderSearchTests
 
         public IReadOnlyList<(string Name, string Path)> Results { get; init; } = [];
 
+        public IReadOnlySet<uint> FolderResultIndexes { get; init; } = new HashSet<uint>();
+
         public Action<uint>? ResultRead { get; init; }
 
         public bool DatabaseLoaded { get; init; } = true;
@@ -449,6 +479,9 @@ public sealed class EverythingFolderSearchTests
         }
 
         public string? GetResultPath(uint index) => Results[(int)index].Path;
+
+        public bool IsFolderResult(uint index) =>
+            FolderResultIndexes.Count == 0 || FolderResultIndexes.Contains(index);
 
         public uint GetLastError()
         {

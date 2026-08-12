@@ -8,9 +8,11 @@ public sealed class SettingsViewModel : ObservableObject
     private readonly AppConfiguration _configuration;
     private readonly IMappingStore _store;
     private readonly IHotkeyRegistration _hotkey;
+    private readonly IHotkeyRegistration _launcherHotkey;
     private readonly IStartupRegistration _startup;
     private readonly IFolderSearch _search;
     private string _shortcut = string.Empty;
+    private string _launcherShortcut = string.Empty;
     private bool _startWithWindows;
     private bool _automaticallyCheckForUpdates;
     private string _everythingHealthText = string.Empty;
@@ -28,7 +30,8 @@ public sealed class SettingsViewModel : ObservableObject
         IHotkeyRegistration hotkey,
         IStartupRegistration startup,
         IFolderSearch search,
-        ApplicationUpdateViewModel? update = null)
+        ApplicationUpdateViewModel? update = null,
+        IHotkeyRegistration? launcherHotkey = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(store);
@@ -38,6 +41,9 @@ public sealed class SettingsViewModel : ObservableObject
         _configuration = configuration;
         _store = store;
         _hotkey = hotkey;
+        _launcherHotkey = launcherHotkey ?? new UnavailableHotkeyRegistration(
+            configuration.Settings.QuickLauncherShortcut,
+            "启动器快捷键服务尚未就绪。");
         _startup = startup;
         _search = search;
         Update = update;
@@ -52,12 +58,16 @@ public sealed class SettingsViewModel : ObservableObject
             SaveAsync,
             () => !IsSaving,
             exception => Message = $"无法保存设置：{exception.Message}");
+        OpenQuickLauncherCommand = new RelayCommand(
+            () => QuickLauncherRequested?.Invoke(this, EventArgs.Empty));
         BeginEdit();
     }
 
     public event EventHandler? HideRequested;
 
     public event EventHandler? Saved;
+
+    public event EventHandler? QuickLauncherRequested;
 
     public ObservableCollection<MappingGroupEditorViewModel> MappingGroups { get; } = [];
 
@@ -98,6 +108,12 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _shortcut;
         set => SetProperty(ref _shortcut, value ?? string.Empty);
+    }
+
+    public string LauncherShortcut
+    {
+        get => _launcherShortcut;
+        set => SetProperty(ref _launcherShortcut, value ?? string.Empty);
     }
 
     public bool StartWithWindows
@@ -169,9 +185,12 @@ public sealed class SettingsViewModel : ObservableObject
 
     public AsyncRelayCommand SaveCommand { get; }
 
+    public RelayCommand OpenQuickLauncherCommand { get; }
+
     public void BeginEdit()
     {
         Shortcut = _configuration.Settings.GlobalShortcut;
+        LauncherShortcut = _configuration.Settings.QuickLauncherShortcut;
         StartWithWindows = _configuration.Settings.StartWithWindows;
         AutomaticallyCheckForUpdates =
             _configuration.Settings.AutomaticallyCheckForUpdates;
@@ -276,18 +295,32 @@ public sealed class SettingsViewModel : ObservableObject
         IsSaving = true;
         var previous = _configuration.Clone();
         var hotkeyAttempted = false;
+        var launcherHotkeyAttempted = false;
         var startupAttempted = false;
         var persistenceAttempted = false;
         try
         {
             var shortcut = CanonicalizeShortcut(Shortcut);
-            var candidate = BuildCandidate(shortcut);
+            var launcherShortcut = CanonicalizeShortcut(LauncherShortcut);
+            if (string.Equals(shortcut, launcherShortcut, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new SettingsTransactionException("两个全局快捷键不能相同。");
+            }
+
+            var candidate = BuildCandidate(shortcut, launcherShortcut);
 
             hotkeyAttempted = true;
             var hotkeyResult = _hotkey.TryReplace(shortcut);
             if (!hotkeyResult.Success)
             {
                 throw new SettingsTransactionException(hotkeyResult.Message);
+            }
+
+            launcherHotkeyAttempted = true;
+            var launcherHotkeyResult = _launcherHotkey.TryReplace(launcherShortcut);
+            if (!launcherHotkeyResult.Success)
+            {
+                throw new SettingsTransactionException(launcherHotkeyResult.Message);
             }
 
             startupAttempted = true;
@@ -301,6 +334,7 @@ public sealed class SettingsViewModel : ObservableObject
             await _store.SaveAsync(candidate);
             _configuration.ReplaceWith(candidate);
             Shortcut = shortcut;
+            LauncherShortcut = launcherShortcut;
             Message = "设置已保存。";
             RaiseSaved();
             RaiseHideRequested();
@@ -314,6 +348,7 @@ public sealed class SettingsViewModel : ObservableObject
             var rollbackMessage = await RollBackAsync(
                 previous,
                 hotkeyAttempted,
+                launcherHotkeyAttempted,
                 startupAttempted,
                 persistenceAttempted);
             Message = $"无法保存设置：{exception.Message}{rollbackMessage}";
@@ -337,13 +372,14 @@ public sealed class SettingsViewModel : ObservableObject
         };
     }
 
-    private AppConfiguration BuildCandidate(string shortcut)
+    private AppConfiguration BuildCandidate(string shortcut, string launcherShortcut)
     {
         ValidateMappingGroups();
         var candidate = Organizer.BuildCandidate();
         candidate.Settings = candidate.Settings with
         {
             GlobalShortcut = shortcut,
+            QuickLauncherShortcut = launcherShortcut,
             StartWithWindows = StartWithWindows,
             AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates
         };
@@ -439,6 +475,7 @@ public sealed class SettingsViewModel : ObservableObject
     private async Task<string> RollBackAsync(
         AppConfiguration previous,
         bool hotkeyAttempted,
+        bool launcherHotkeyAttempted,
         bool startupAttempted,
         bool persistenceAttempted)
     {
@@ -484,6 +521,23 @@ public sealed class SettingsViewModel : ObservableObject
             catch (Exception exception)
             {
                 failures.Add($"恢复快捷键失败：{exception.Message}");
+            }
+        }
+
+        if (launcherHotkeyAttempted)
+        {
+            try
+            {
+                var result = _launcherHotkey.TryReplace(
+                    previous.Settings.QuickLauncherShortcut);
+                if (!result.Success)
+                {
+                    failures.Add($"恢复启动器快捷键失败：{result.Message}");
+                }
+            }
+            catch (Exception exception)
+            {
+                failures.Add($"恢复启动器快捷键失败：{exception.Message}");
             }
         }
 

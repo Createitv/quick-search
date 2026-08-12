@@ -10,17 +10,19 @@ public sealed class TrayIconControllerTests
         using var controller = new TrayIconController(
             trayIcon,
             () => operations.Add("open"),
+            () => operations.Add("launcher"),
             () => throw new InvalidOperationException("settings exploded"),
             () => operations.Add("exit"));
 
         var start = controller.Start();
         trayIcon.RaiseOpen();
+        trayIcon.RaiseLauncher();
         var settingsException = Record.Exception(trayIcon.RaiseSettings);
         trayIcon.RaiseExit();
 
         Assert.True(start.Success);
         Assert.Equal(1, trayIcon.ShowCalls);
-        Assert.Equal(["open", "exit"], operations);
+        Assert.Equal(["open", "launcher", "exit"], operations);
         Assert.Null(settingsException);
         Assert.Contains("settings exploded", controller.LastFailure);
     }
@@ -36,6 +38,7 @@ public sealed class TrayIconControllerTests
             trayIcon,
             () => { },
             () => { },
+            () => { },
             () => { });
 
         var result = controller.Start();
@@ -47,6 +50,8 @@ public sealed class TrayIconControllerTests
     private sealed class FakeTrayIcon : ITrayIcon
     {
         public event EventHandler? OpenRequested;
+
+        public event EventHandler? LauncherRequested;
 
         public event EventHandler? SettingsRequested;
 
@@ -64,6 +69,8 @@ public sealed class TrayIconControllerTests
         }
 
         public void RaiseOpen() => OpenRequested?.Invoke(this, EventArgs.Empty);
+
+        public void RaiseLauncher() => LauncherRequested?.Invoke(this, EventArgs.Empty);
 
         public void RaiseSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
 

@@ -257,6 +257,40 @@
     <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
   </Style>
 
+  <Style x:Key="WindowCaptionButtonStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="43" />
+    <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="CaptionSurface" Background="{TemplateBinding Background}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="CaptionSurface" Property="Opacity" Value="0.72" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="{DynamicResource SoftBlueBrush}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <Style x:Key="WindowCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowCaptionButtonStyle}">
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Background" Value="#E81123" />
+        <Setter Property="Foreground" Value="White" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
   <Style x:Key="ExplorerTreeItemStyle" TargetType="Button" BasedOn="{StaticResource QuietButtonStyle}">
     <Setter Property="MinHeight" Value="34" />
     <Setter Property="Padding" Value="8,6" />
@@ -280,8 +314,8 @@
   </Style>
 
   <Style x:Key="FolderCardButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
-    <Setter Property="Height" Value="104" />
-    <Setter Property="Padding" Value="16,14" />
+    <Setter Property="Height" Value="88" />
+    <Setter Property="Padding" Value="14,12" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
     <Setter Property="VerticalContentAlignment" Value="Top" />
     <Setter Property="Background" Value="{DynamicResource MutedSurfaceBrush}" />

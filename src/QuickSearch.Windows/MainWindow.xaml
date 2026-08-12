@@ -3,12 +3,18 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="" Icon="Assets/QuickSearch.ico" Width="1080" Height="720"
         MinWidth="820" MinHeight="560"
+        WindowStyle="None" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
         Activated="Window_Activated"
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+                        CornerRadius="0" GlassFrameThickness="0" />
+  </shell:WindowChrome.WindowChrome>
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <HierarchicalDataTemplate DataType="{x:Type core:NavigationFolderNodeViewModel}"
@@ -60,28 +66,31 @@
 
   <Grid Background="{DynamicResource PaperBrush}">
     <Grid.RowDefinitions>
-      <RowDefinition Height="72" />
+      <RowDefinition Height="44" />
       <RowDefinition Height="*" />
       <RowDefinition Height="48" />
     </Grid.RowDefinitions>
 
-    <Border Grid.Row="0" Padding="20,14" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1">
+    <Border Grid.Row="0" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
+            Background="{DynamicResource PaperBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
       <Grid>
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="44" />
           <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="138" />
         </Grid.ColumnDefinitions>
-        <Border Width="38" Height="38" Margin="0,0,12,0" Background="{DynamicResource SoftBlueBrush}" CornerRadius="11">
-          <ui:SymbolIcon Symbol="Pin24" FontSize="20" Foreground="{DynamicResource RouteBlueBrush}" />
+        <Border Margin="8,6" Background="{DynamicResource SoftBlueBrush}" CornerRadius="8">
+          <ui:SymbolIcon Symbol="Pin20" FontSize="17" Foreground="{DynamicResource RouteBlueBrush}" />
         </Border>
-        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ScrollViewer Grid.Column="1" Margin="4,5,8,5"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
           <ItemsControl ItemsSource="{Binding Explorer.PinnedFolders}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Button Margin="0,0,8,0"
+                <Button Margin="0,0,6,0" MinHeight="32" Padding="11,5"
                         Style="{StaticResource PinnedFolderButtonStyle}"
                         Command="{Binding DataContext.Explorer.NavigateFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                         CommandParameter="{Binding}"
@@ -101,12 +110,31 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </ScrollViewer>
+        <Grid Grid.Column="2" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="46" />
+            <ColumnDefinition Width="46" />
+            <ColumnDefinition Width="46" />
+          </Grid.ColumnDefinitions>
+          <Button Padding="0" Style="{StaticResource WindowCaptionButtonStyle}"
+                  ToolTip="最小化" Click="MinimizeWindow_Click">
+            <ui:SymbolIcon Symbol="Subtract20" FontSize="15" />
+          </Button>
+          <Button Grid.Column="1" Padding="0" Style="{StaticResource WindowCaptionButtonStyle}"
+                  ToolTip="最大化" Click="MaximizeWindow_Click">
+            <ui:SymbolIcon Symbol="Square20" FontSize="13" />
+          </Button>
+          <Button Grid.Column="2" Padding="0" Style="{StaticResource WindowCloseButtonStyle}"
+                  ToolTip="隐藏" Click="CloseWindow_Click">
+            <ui:SymbolIcon Symbol="Dismiss20" FontSize="15" />
+          </Button>
+        </Grid>
       </Grid>
     </Border>
 
     <Grid Grid.Row="1">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="238" />
+        <ColumnDefinition Width="210" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
@@ -129,7 +157,7 @@
         </DockPanel>
       </Border>
 
-      <Grid Grid.Column="1" Margin="24,20,24,18">
+      <Grid Grid.Column="1" Margin="20,16,20,16">
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
           <RowDefinition Height="Auto" />
@@ -138,8 +166,8 @@
 
         <Grid>
           <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="340" />
           </Grid.ColumnDefinitions>
           <ItemsControl VerticalAlignment="Center" ItemsSource="{Binding Explorer.Breadcrumbs}">
             <ItemsControl.ItemsPanel>
@@ -158,8 +186,9 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
-          <Grid Grid.Column="1">
+          <Grid Grid.Column="1" Margin="24,0,0,0" MinWidth="420">
             <TextBox x:Name="SearchBox" Padding="38,9,34,9"
+                     MinHeight="48" FontSize="15"
                      AutomationProperties.Name="搜索规则和文件夹"
                      Text="{Binding Explorer.SearchText, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
             <ui:SymbolIcon Margin="13,0,0,0" Symbol="Search20" FontSize="18"
@@ -207,7 +236,7 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Button Width="210" Margin="0,0,12,12" Style="{StaticResource FolderCardButtonStyle}"
+                <Button Width="184" Margin="0,0,10,10" Style="{StaticResource FolderCardButtonStyle}"
                         Command="{Binding DataContext.Explorer.NavigateFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                         CommandParameter="{Binding}">
                   <StackPanel>
@@ -447,11 +476,18 @@
                      Style="{StaticResource SecondaryTextStyle}" VerticalAlignment="Center" />
         </StackPanel>
         <TextBlock Grid.Column="1" Margin="18,0" Text="{Binding Status}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource SlateBrush}" />
-        <Button Grid.Column="2" Width="34" Height="34" Padding="0"
-                ToolTip="设置" AutomationProperties.Name="设置"
-                Style="{StaticResource BottomGearButtonStyle}" Command="{Binding ShowSettingsCommand}">
-          <ui:SymbolIcon Symbol="Settings24" FontSize="19" />
-        </Button>
+        <StackPanel Grid.Column="2" Orientation="Horizontal">
+          <Button Width="34" Height="34" Padding="0" Margin="0,0,4,0"
+                  ToolTip="打开快速启动器" AutomationProperties.Name="打开快速启动器"
+                  Style="{StaticResource BottomGearButtonStyle}" Click="QuickLauncher_Click">
+            <ui:SymbolIcon Symbol="Search20" FontSize="18" />
+          </Button>
+          <Button Width="34" Height="34" Padding="0"
+                  ToolTip="设置" AutomationProperties.Name="设置"
+                  Style="{StaticResource BottomGearButtonStyle}" Command="{Binding ShowSettingsCommand}">
+            <ui:SymbolIcon Symbol="Settings24" FontSize="19" />
+          </Button>
+        </StackPanel>
       </Grid>
     </Border>
   </Grid>

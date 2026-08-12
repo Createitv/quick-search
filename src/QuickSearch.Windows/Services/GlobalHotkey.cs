@@ -12,14 +12,15 @@ public sealed partial class GlobalHotkey : IHotkeyRegistration, IDisposable
 
     public event EventHandler? Pressed;
 
-    public GlobalHotkey(System.Windows.Window window)
+    public GlobalHotkey(System.Windows.Window window, int firstRegistrationId = 0x5146)
     {
         var handle = new WindowInteropHelper(window).Handle;
         _source = HwndSource.FromHwnd(handle)
                   ?? throw new InvalidOperationException("Window handle is unavailable.");
         _source.AddHook(WindowProc);
         _registrations = new HotkeyRegistrationController(
-            new Win32HotkeyRegistrar(_source.Handle));
+            new Win32HotkeyRegistrar(_source.Handle),
+            firstRegistrationId);
     }
 
     public string? ActiveShortcut => _registrations.ActiveShortcut;

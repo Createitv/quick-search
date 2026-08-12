@@ -3,13 +3,19 @@ namespace QuickSearch.Core;
 public static class EverythingQueryBuilder
 {
     public static string Build(string query)
+        => BuildCore(query, foldersOnly: true);
+
+    public static string BuildLauncher(string query)
+        => BuildCore(query, foldersOnly: false);
+
+    private static string BuildCore(string query, bool foldersOnly)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
         var value = query.Trim();
         if (!value.Contains('"'))
         {
-            return $"folder: nowildcards:\"{value}\"";
+            return $"{(foldersOnly ? "folder: " : string.Empty)}nowildcards:\"{value}\"";
         }
 
         var parts = value.Split('"');
@@ -27,6 +33,6 @@ public static class EverythingQueryBuilder
             }
         }
 
-        return $"folder: nowildcards:<{string.Join(' ', encoded)}>";
+        return $"{(foldersOnly ? "folder: " : string.Empty)}nowildcards:<{string.Join(' ', encoded)}>";
     }
 }

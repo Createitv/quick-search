@@ -18,5 +18,7 @@ public interface IEverythingNative
 
     string? GetResultPath(uint index);
 
+    bool IsFolderResult(uint index);
+
     uint GetLastError();
 }

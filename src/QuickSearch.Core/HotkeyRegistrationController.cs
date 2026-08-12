@@ -16,16 +16,17 @@ public interface IHotkeyRegistration
 
 public sealed class HotkeyRegistrationController : IHotkeyRegistration, IDisposable
 {
-    private const int FirstRegistrationId = 0x5146;
-    private const int SecondRegistrationId = 0x5147;
-
     private readonly IHotkeyRegistrar _registrar;
+    private readonly int _firstRegistrationId;
+    private readonly int _secondRegistrationId;
     private int? _activeRegistrationId;
 
-    public HotkeyRegistrationController(IHotkeyRegistrar registrar)
+    public HotkeyRegistrationController(IHotkeyRegistrar registrar, int firstRegistrationId = 0x5146)
     {
         ArgumentNullException.ThrowIfNull(registrar);
         _registrar = registrar;
+        _firstRegistrationId = firstRegistrationId;
+        _secondRegistrationId = firstRegistrationId + 1;
     }
 
     public string? ActiveShortcut { get; private set; }
@@ -40,9 +41,9 @@ public sealed class HotkeyRegistrationController : IHotkeyRegistration, IDisposa
             return PlatformOperationResult.Succeeded();
         }
 
-        var candidateId = _activeRegistrationId == FirstRegistrationId
-            ? SecondRegistrationId
-            : FirstRegistrationId;
+        var candidateId = _activeRegistrationId == _firstRegistrationId
+            ? _secondRegistrationId
+            : _firstRegistrationId;
 
         try
         {
