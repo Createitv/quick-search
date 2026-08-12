@@ -659,9 +659,9 @@ public partial class MainWindow : Window, IDisposable
         var choice = System.Windows.MessageBox.Show(
             $"确定删除快捷方式“{rule.DisplayTitle}”吗？\n\n只会删除快捷方式，不会删除真实文件夹。",
             "删除快捷方式",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-        if (choice == MessageBoxResult.Yes)
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning);
+        if (choice == System.Windows.MessageBoxResult.Yes)
         {
             await _viewModel.Explorer.DeleteRuleAsync(rule.Id);
         }
@@ -895,8 +895,8 @@ public partial class MainWindow : Window, IDisposable
             System.Windows.MessageBox.Show(
                 "“未分类”不能删除。",
                 "删除文件夹",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
             return;
         }
 
@@ -905,16 +905,16 @@ public partial class MainWindow : Window, IDisposable
             + "选择“否”：删除整棵文件夹树及其中的所有快捷方式。\n\n"
             + "真实磁盘文件夹不会被删除。",
             $"删除“{node.Name}”",
-            MessageBoxButton.YesNoCancel,
-            MessageBoxImage.Warning);
-        if (choice == MessageBoxResult.Cancel)
+            System.Windows.MessageBoxButton.YesNoCancel,
+            System.Windows.MessageBoxImage.Warning);
+        if (choice == System.Windows.MessageBoxResult.Cancel)
         {
             return;
         }
 
         await _viewModel.Explorer.DeleteFolderAsync(
             node.Id,
-            choice == MessageBoxResult.Yes
+            choice == System.Windows.MessageBoxResult.Yes
                 ? FolderDeletionMode.MoveContentsToParent
                 : FolderDeletionMode.DeleteSubtree);
     }

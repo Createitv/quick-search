@@ -2,9 +2,9 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using QuickSearch.Core;
-using Wpf.Ui.Controls;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 using FormsDialogResult = System.Windows.Forms.DialogResult;
+using SymbolRegular = Wpf.Ui.Controls.SymbolRegular;
 
 namespace QuickSearch.Windows;
 
