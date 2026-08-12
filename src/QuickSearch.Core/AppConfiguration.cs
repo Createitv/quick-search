@@ -10,7 +10,7 @@ public sealed class AppConfiguration
     private readonly List<NavigationFolder> _navigationFolders = [];
     private readonly List<FolderRule> _rules = [];
     private readonly List<Guid> _pinnedFolderIds = [];
-    private readonly TimeProvider _timeProvider;
+    private TimeProvider _timeProvider;
 
     public AppConfiguration()
         : this(TimeProvider.System)
@@ -417,6 +417,7 @@ public sealed class AppConfiguration
     public void ReplaceWith(AppConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        _timeProvider = configuration._timeProvider;
         Settings = configuration.Settings with { };
         _navigationFolders.Clear();
         _navigationFolders.AddRange(configuration._navigationFolders.Select(folder => folder with { }));

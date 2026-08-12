@@ -28,7 +28,7 @@ public sealed class LauncherViewModelTests
     }
 
     [Fact]
-    public async Task ActivateFromClipboardAsync_UnmappedKeywordSearchesEverythingAndShowsLauncher()
+    public async Task ActivateFromClipboardAsync_UnmappedKeywordSearchesLocalIndexAndShowsLauncher()
     {
         var search = new FakeFolderSearch
         {
@@ -43,9 +43,11 @@ public sealed class LauncherViewModelTests
         var disposition = await viewModel.ActivateFromClipboardAsync();
 
         Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
-        Assert.Equal("sales", viewModel.SearchText);
-        Assert.Equal("/found/sales", viewModel.SelectedResult?.FullPath);
-        Assert.Equal(1, search.SearchCalls);
+        Assert.Equal("sales", viewModel.Explorer.SearchText);
+        Assert.True(viewModel.CanSearchEverything);
+        Assert.Empty(viewModel.Results);
+        Assert.Null(viewModel.SelectedResult);
+        Assert.Equal(0, search.SearchCalls);
     }
 
     [Fact]
@@ -62,6 +64,7 @@ public sealed class LauncherViewModelTests
 
         Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
         Assert.Equal(string.Empty, viewModel.SearchText);
+        Assert.Equal(string.Empty, viewModel.Explorer.SearchText);
         Assert.Empty(viewModel.Results);
         Assert.Null(viewModel.SelectedResult);
     }
@@ -86,9 +89,69 @@ public sealed class LauncherViewModelTests
 
         Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
         Assert.Equal(["/sales/current"], opener.OpenedPaths);
-        Assert.Equal("sales", viewModel.SearchText);
-        Assert.Equal(1, search.SearchCalls);
+        Assert.Equal("sales", viewModel.Explorer.SearchText);
+        Assert.True(viewModel.Explorer.HasLocalSearchResults);
+        Assert.False(viewModel.CanSearchEverything);
+        Assert.Equal(0, search.SearchCalls);
         Assert.Contains("失效", viewModel.Status);
+    }
+
+    [Fact]
+    public async Task LocalSearchMatch_DoesNotExposeEverythingFallback()
+    {
+        var configuration = new AppConfiguration();
+        var folder = configuration.AddNavigationFolder("客户项目", null);
+        configuration.AddRule("销售资料", ["sales"], "/clients/sales", folder.Id);
+        var search = new FakeFolderSearch();
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(configuration),
+            search: search);
+        await viewModel.InitializeAsync();
+
+        viewModel.Explorer.SearchText = "sales";
+
+        Assert.True(viewModel.Explorer.HasLocalSearchResults);
+        Assert.False(viewModel.CanSearchEverything);
+        Assert.Equal(0, search.SearchCalls);
+    }
+
+    [Fact]
+    public async Task SearchEverythingAsync_FillsExistingResultsAndPreservesExplorerText()
+    {
+        var search = new FakeFolderSearch
+        {
+            Results = [new FolderSearchResult("Sales", "/found/sales")]
+        };
+        var viewModel = CreateViewModel(
+            new FakeMappingStore(new AppConfiguration()),
+            search: search);
+        await viewModel.InitializeAsync();
+        viewModel.Explorer.SearchText = "sales";
+
+        await viewModel.SearchEverythingAsync();
+
+        Assert.Equal("sales", viewModel.Explorer.SearchText);
+        Assert.Equal("sales", viewModel.FolderQuery);
+        Assert.Equal("/found/sales", viewModel.SelectedResult?.FullPath);
+        Assert.True(viewModel.IsEverythingSearchVisible);
+        Assert.Equal(1, search.SearchCalls);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_PopulatesExplorerFromLoadedConfiguration()
+    {
+        var configuration = new AppConfiguration();
+        var folder = configuration.AddNavigationFolder("工作区", null);
+        configuration.PinFolder(folder.Id);
+        configuration.AddRule("项目文档", ["docs"], "/workspace/docs", folder.Id);
+        var viewModel = CreateViewModel(new FakeMappingStore(configuration));
+
+        await viewModel.InitializeAsync();
+        viewModel.Explorer.NavigateToFolder(folder.Id);
+
+        Assert.Contains(viewModel.Explorer.PinnedFolders, item => item.Id == folder.Id);
+        Assert.Equal("工作区", viewModel.Explorer.CurrentFolder.Name);
+        Assert.Equal("项目文档", Assert.Single(viewModel.Explorer.CurrentRules).DisplayTitle);
     }
 
     [Fact]
@@ -486,7 +549,7 @@ public sealed class LauncherViewModelTests
         var configuration = new AppConfiguration();
         var viewModel = CreateViewModel(new FakeMappingStore(configuration));
         await viewModel.InitializeAsync();
-        configuration.Settings = configuration.Settings with
+        viewModel.Configuration.Settings = viewModel.Configuration.Settings with
         {
             GlobalShortcut = "Ctrl+Shift+9"
         };

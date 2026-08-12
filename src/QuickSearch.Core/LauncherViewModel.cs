@@ -20,6 +20,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     private IReadOnlyList<FolderSearchResult> _results = [];
     private FolderSearchResult? _selectedResult;
     private FolderMapping? _exactMapping;
+    private bool _isEverythingSearchVisible;
     private bool _disposed;
 
     public LauncherViewModel(
@@ -41,10 +42,23 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         _folderExists = folderExists ?? Directory.Exists;
         _delayAsync = delayAsync ?? Task.Delay;
 
+        Explorer = new RuleExplorerViewModel(
+            _configuration,
+            _store,
+            _opener,
+            _folderExists);
+        Explorer.PropertyChanged += HandleExplorerPropertyChanged;
+        Explorer.StatusReported += HandleExplorerStatusReported;
+        Explorer.ConfigurationChanged += HandleExplorerConfigurationChanged;
+
         SearchCommand = new AsyncRelayCommand(
             SearchNowAsync,
             () => !string.IsNullOrWhiteSpace(FolderQuery),
             exception => SetStatus($"搜索失败：{exception.Message}", StatusKind.Error));
+        SearchEverythingCommand = new AsyncRelayCommand(
+            SearchEverythingAsync,
+            () => CanSearchEverything,
+            exception => SetStatus($"Everything 查询失败：{exception.Message}", StatusKind.Error));
         ConfirmOpenCommand = new AsyncRelayCommand(
             ConfirmAndOpenAsync,
             () => CanConfirmOpen,
@@ -64,17 +78,9 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
     public event EventHandler? ShowSettingsRequested;
 
-    public AppConfiguration Configuration
-    {
-        get => _configuration;
-        private set
-        {
-            if (SetProperty(ref _configuration, value))
-            {
-                OnPropertyChanged(nameof(ShortcutInstruction));
-            }
-        }
-    }
+    public AppConfiguration Configuration => _configuration;
+
+    public RuleExplorerViewModel Explorer { get; }
 
     public string Alias
     {
@@ -92,15 +98,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     public string FolderQuery
     {
         get => _folderQuery;
-        set
-        {
-            if (SetProperty(ref _folderQuery, value ?? string.Empty))
-            {
-                OnPropertyChanged(nameof(SearchText));
-                SearchCommand.NotifyCanExecuteChanged();
-                QueueDebouncedSearch();
-            }
-        }
+        set => SetFolderQuery(value, queueSearch: true);
     }
 
     public string SearchText
@@ -124,7 +122,13 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     public IReadOnlyList<FolderSearchResult> Results
     {
         get => _results;
-        private set => SetProperty(ref _results, value);
+        private set
+        {
+            if (SetProperty(ref _results, value))
+            {
+                OnPropertyChanged(nameof(IsEverythingSearchVisible));
+            }
+        }
     }
 
     public FolderSearchResult? SelectedResult
@@ -156,7 +160,14 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
     public bool CanOpenSelected => SelectedResult is not null;
 
+    public bool CanSearchEverything =>
+        Explorer.IsSearching && !Explorer.HasLocalSearchResults;
+
+    public bool IsEverythingSearchVisible => _isEverythingSearchVisible;
+
     public AsyncRelayCommand SearchCommand { get; }
+
+    public AsyncRelayCommand SearchEverythingCommand { get; }
 
     public AsyncRelayCommand ConfirmOpenCommand { get; }
 
@@ -174,7 +185,10 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     {
         try
         {
-            Configuration = await _store.LoadAsync(cancellationToken);
+            var loaded = await _store.LoadAsync(cancellationToken);
+            Configuration.ReplaceWith(loaded);
+            Explorer.RefreshFromConfiguration();
+            OnPropertyChanged(nameof(ShortcutInstruction));
             RefreshAliasState();
         }
         catch (OperationCanceledException)
@@ -254,7 +268,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var mappings = Configuration.FindMappings(keyword);
         if (mappings.Count == 0)
         {
-            await SearchKeywordAsync(keyword);
+            ShowLocalSearch(keyword);
             return LauncherActivationDisposition.ShowLauncher;
         }
 
@@ -301,6 +315,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             {
                 await _store.SaveAsync(candidate);
                 Configuration.ReplaceWith(candidate);
+                Explorer.RefreshFromConfiguration();
             }
             catch (Exception exception)
             {
@@ -315,7 +330,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
             return LauncherActivationDisposition.OpenedMappings;
         }
 
-        await SearchKeywordAsync(keyword);
+        ShowLocalSearch(keyword);
         SetStatus(
             $"已打开 {openedPaths.Count} 个文件夹；{string.Join("；", failures)}",
             StatusKind.Error);
@@ -336,6 +351,27 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
 
         return ExecuteSearchAsync(query, generation, cancellation.Token);
+    }
+
+    public Task SearchEverythingAsync()
+    {
+        ThrowIfDisposed();
+        var query = Explorer.SearchText.Trim();
+        if (query.Length == 0)
+        {
+            SetStatus("请先输入搜索关键词。", StatusKind.Neutral);
+            return Task.CompletedTask;
+        }
+
+        if (Explorer.HasLocalSearchResults)
+        {
+            SetStatus("已找到本地文件夹或规则。", StatusKind.Neutral);
+            return Task.CompletedTask;
+        }
+
+        SetFolderQuery(query, queueSearch: false);
+        SetEverythingSearchVisible(true);
+        return SearchNowAsync();
     }
 
     public void CancelSearch()
@@ -399,6 +435,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
 
         Configuration.ReplaceWith(candidate);
+        Explorer.RefreshFromConfiguration();
         OnPropertyChanged(nameof(ShortcutInstruction));
         HideRequested?.Invoke(this, EventArgs.Empty);
     }
@@ -476,6 +513,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
     public void RefreshConfiguration()
     {
+        Explorer.RefreshFromConfiguration();
         OnPropertyChanged(nameof(ShortcutInstruction));
         RefreshAliasState();
     }
@@ -495,6 +533,9 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
         _disposed = true;
         CancelCurrentSearch();
+        Explorer.PropertyChanged -= HandleExplorerPropertyChanged;
+        Explorer.StatusReported -= HandleExplorerStatusReported;
+        Explorer.ConfigurationChanged -= HandleExplorerConfigurationChanged;
     }
 
     private void RefreshAliasState()
@@ -550,17 +591,86 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         _ = DebounceAndSearchAsync(query, generation, cancellation.Token);
     }
 
-    private async Task SearchKeywordAsync(string keyword)
-    {
-        SearchText = keyword;
-        await SearchNowAsync();
-    }
-
     private void ClearSearchText()
     {
-        SearchText = string.Empty;
+        SetFolderQuery(string.Empty, queueSearch: false);
+        Explorer.SearchText = string.Empty;
+        SetEverythingSearchVisible(false);
         Results = [];
         SelectedResult = null;
+    }
+
+    private void ShowLocalSearch(string keyword)
+    {
+        SetFolderQuery(string.Empty, queueSearch: false);
+        Results = [];
+        SelectedResult = null;
+        SetEverythingSearchVisible(false);
+        Explorer.SearchText = keyword;
+        SetStatus(
+            Explorer.HasLocalSearchResults
+                ? $"已在本地索引中找到 {Explorer.SearchResults.Count} 个结果。"
+                : "未找到本地规则，可使用 Everything 搜索文件夹。",
+            StatusKind.Neutral);
+    }
+
+    private void SetFolderQuery(string? value, bool queueSearch)
+    {
+        if (!SetProperty(ref _folderQuery, value ?? string.Empty, nameof(FolderQuery)))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(SearchText));
+        SearchCommand.NotifyCanExecuteChanged();
+        if (queueSearch)
+        {
+            QueueDebouncedSearch();
+        }
+    }
+
+    private void SetEverythingSearchVisible(bool value)
+    {
+        if (_isEverythingSearchVisible == value)
+        {
+            return;
+        }
+
+        _isEverythingSearchVisible = value;
+        OnPropertyChanged(nameof(IsEverythingSearchVisible));
+    }
+
+    private void HandleExplorerPropertyChanged(
+        object? sender,
+        System.ComponentModel.PropertyChangedEventArgs eventArgs)
+    {
+        if (eventArgs.PropertyName == nameof(RuleExplorerViewModel.SearchText))
+        {
+            InvalidatePendingSearch();
+            Results = [];
+            SelectedResult = null;
+            SetEverythingSearchVisible(false);
+        }
+
+        if (eventArgs.PropertyName is nameof(RuleExplorerViewModel.SearchText)
+            or nameof(RuleExplorerViewModel.IsSearching)
+            or nameof(RuleExplorerViewModel.HasLocalSearchResults)
+            or nameof(RuleExplorerViewModel.SearchResults))
+        {
+            OnPropertyChanged(nameof(CanSearchEverything));
+            SearchEverythingCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private void HandleExplorerStatusReported(
+        object? sender,
+        ExplorerStatusEventArgs eventArgs) =>
+        SetStatus(eventArgs.Message, eventArgs.Kind);
+
+    private void HandleExplorerConfigurationChanged(object? sender, EventArgs eventArgs)
+    {
+        OnPropertyChanged(nameof(ShortcutInstruction));
+        RefreshAliasState();
     }
 
     private async Task DebounceAndSearchAsync(
