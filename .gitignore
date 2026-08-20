@@ -12,5 +12,6 @@ src/QuickSearch.Windows/native/*.dll
 src/QuickSearch.Windows/dependencies/Everything-Setup.exe
 src/QuickSearch.Windows/dependencies/Everything-Setup.sha256
 .superpowers/
+.wrangler/
 *.user
 *.suo

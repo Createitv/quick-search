@@ -68,14 +68,10 @@ public partial class App : System.Windows.Application
         var configPath = Path.Combine(configDirectory, "config.json");
         var configurationExistedAtStartup = File.Exists(configPath);
         var store = new JsonMappingStore(configPath);
-        _updateHttpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromMinutes(5)
-        };
-        var updateService = new GitHubReleaseUpdateService(
+        _updateHttpClient = UpdateHttpClientFactory.Create();
+        var updateService = new ManifestUpdateService(
             _updateHttpClient,
-            "Createitv",
-            "quick-search",
+            new Uri("https://quick-search-updates.xfy150150.workers.dev/latest.json"),
             Path.Combine(configDirectory, "updates"),
             new WindowsInstallerLauncher());
         var installedVersion = Assembly.GetEntryAssembly()?.GetName().Version;

@@ -108,10 +108,18 @@ public sealed class ApplicationUpdateViewModel : ObservableObject
                 StatusText = "已是最新版本。";
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             State = ApplicationUpdateState.Idle;
             StatusText = "更新检查已取消。";
+        }
+        catch (OperationCanceledException exception)
+        {
+            HandleConnectionFailure(exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            HandleConnectionFailure(exception);
         }
         catch (Exception exception)
         {
@@ -150,15 +158,31 @@ public sealed class ApplicationUpdateViewModel : ObservableObject
             StatusText = "安装程序已启动，QuickSearch 即将退出。";
             ShutdownRequested?.Invoke(this, EventArgs.Empty);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             State = ApplicationUpdateState.Available;
             StatusText = "更新下载已取消。";
+        }
+        catch (OperationCanceledException exception)
+        {
+            HandleConnectionFailure(exception);
+        }
+        catch (HttpRequestException exception)
+        {
+            HandleConnectionFailure(exception);
         }
         catch (Exception exception)
         {
             HandleFailure(exception);
         }
+    }
+
+    private void HandleConnectionFailure(Exception exception)
+    {
+        State = ApplicationUpdateState.Failed;
+        StatusText =
+            "更新失败：无法连接更新服务器。请检查网络连接或本机代理设置，然后重试。" +
+            $"详细信息：{exception.Message}";
     }
 
     private void HandleFailure(Exception exception)

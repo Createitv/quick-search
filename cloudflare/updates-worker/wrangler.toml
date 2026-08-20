@@ -1,0 +1,8 @@
+name = "quick-search-updates"
+main = "src/index.ts"
+compatibility_date = "2026-08-20"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "UPDATES"
+bucket_name = "quick-search-updates"

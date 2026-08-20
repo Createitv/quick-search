@@ -654,6 +654,9 @@
                 </TextBlock>
                 <TextBlock Margin="0,4,0,0" Text="{Binding Update.StatusText}"
                            TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
+                <TextBlock Margin="0,3,0,0"
+                           Text="更新检查与下载默认跟随 Windows 系统代理。代理软件需开启“系统代理”模式。"
+                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
                 <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
                              Value="{Binding Update.DownloadProgress, Mode=OneWay}" />
               </StackPanel>

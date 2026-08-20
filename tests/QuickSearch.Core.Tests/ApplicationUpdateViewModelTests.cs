@@ -35,6 +35,55 @@ public sealed class ApplicationUpdateViewModelTests
     }
 
     [Fact]
+    public async Task CheckNowAsync_WhenConnectionFails_ExplainsNetworkRecovery()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckException = new HttpRequestException("connection refused")
+        };
+        var viewModel = new ApplicationUpdateViewModel(service, "0.0.2");
+
+        await viewModel.CheckNowAsync();
+
+        Assert.Equal(ApplicationUpdateState.Failed, viewModel.State);
+        Assert.Contains("更新服务器", viewModel.StatusText);
+        Assert.Contains("connection refused", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task CheckNowAsync_WhenHttpClientTimesOut_DoesNotReportUserCancellation()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckException = new TaskCanceledException("request timed out")
+        };
+        var viewModel = new ApplicationUpdateViewModel(service, "0.0.2");
+
+        await viewModel.CheckNowAsync();
+
+        Assert.Equal(ApplicationUpdateState.Failed, viewModel.State);
+        Assert.Contains("更新服务器", viewModel.StatusText);
+        Assert.DoesNotContain("已取消", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task CheckNowAsync_WhenCallerCancels_ReportsCancellation()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckException = new TaskCanceledException("cancelled")
+        };
+        var viewModel = new ApplicationUpdateViewModel(service, "0.0.2");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await viewModel.CheckNowAsync(cancellation.Token);
+
+        Assert.Equal(ApplicationUpdateState.Idle, viewModel.State);
+        Assert.Contains("已取消", viewModel.StatusText);
+    }
+
+    [Fact]
     public async Task DownloadAndInstallAsync_DoesNotLaunchWhenChecksumVerificationFails()
     {
         var service = new FakeUpdateService
@@ -50,6 +99,24 @@ public sealed class ApplicationUpdateViewModelTests
         Assert.Equal(0, service.LaunchCalls);
         Assert.Equal(ApplicationUpdateState.Failed, viewModel.State);
         Assert.Contains("校验失败", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task DownloadAndInstallAsync_WhenConnectionFails_ExplainsNetworkRecovery()
+    {
+        var service = new FakeUpdateService
+        {
+            CheckResult = ApplicationUpdateCheck.Available(CreateRelease("0.0.3")),
+            DownloadException = new HttpRequestException("connection refused")
+        };
+        var viewModel = new ApplicationUpdateViewModel(service, "0.0.2");
+        await viewModel.CheckNowAsync();
+
+        await viewModel.DownloadAndInstallAsync();
+
+        Assert.Equal(0, service.LaunchCalls);
+        Assert.Equal(ApplicationUpdateState.Failed, viewModel.State);
+        Assert.Contains("更新服务器", viewModel.StatusText);
     }
 
     [Fact]
@@ -83,6 +150,8 @@ public sealed class ApplicationUpdateViewModelTests
         public ApplicationUpdateCheck CheckResult { get; init; } =
             ApplicationUpdateCheck.Current("0.0.2");
 
+        public Exception? CheckException { get; init; }
+
         public Exception? DownloadException { get; init; }
 
         public string DownloadedPath { get; init; } = string.Empty;
@@ -92,7 +161,9 @@ public sealed class ApplicationUpdateViewModelTests
         public Task<ApplicationUpdateCheck> CheckAsync(
             AppReleaseVersion installedVersion,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult(CheckResult);
+            CheckException is null
+                ? Task.FromResult(CheckResult)
+                : Task.FromException<ApplicationUpdateCheck>(CheckException);
 
         public Task<string> DownloadAndVerifyAsync(
             ApplicationRelease release,
