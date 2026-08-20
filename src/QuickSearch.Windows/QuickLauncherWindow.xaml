@@ -8,6 +8,7 @@
         MinWidth="520" MinHeight="390" MaxWidth="1200"
         WindowStyle="None" ResizeMode="CanResizeWithGrip"
         Background="Transparent"
+        FontSize="{DynamicResource AppFontSize}"
         ShowInTaskbar="False" Topmost="True"
         SizeChanged="Window_SizeChanged"
         PreviewKeyDown="Window_PreviewKeyDown"
@@ -54,7 +55,7 @@
     <Border.Effect>
       <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.24" Color="#334155" />
     </Border.Effect>
-    <Grid FontSize="{DynamicResource AppFontSize}">
+    <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="76" />
         <RowDefinition Height="*" />

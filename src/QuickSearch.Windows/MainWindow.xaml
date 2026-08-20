@@ -8,6 +8,7 @@
         MinWidth="820" MinHeight="560"
         WindowStyle="None" ResizeMode="CanResize"
         WindowStartupLocation="CenterScreen"
+        FontSize="{DynamicResource AppFontSize}"
         Activated="Window_Activated"
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
@@ -69,8 +70,7 @@
     <KeyBinding Key="Escape" Command="{Binding HideCommand}" />
   </Window.InputBindings>
 
-  <Grid Background="{DynamicResource PaperBrush}"
-        FontSize="{DynamicResource AppFontSize}">
+  <Grid Background="{DynamicResource PaperBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="44" />
       <RowDefinition Height="*" />
