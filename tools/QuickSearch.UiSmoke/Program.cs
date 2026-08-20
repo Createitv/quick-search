@@ -62,10 +62,16 @@ internal static class Program
                 || launcherResults is null
                 || !WaitUntil(
                     application.Dispatcher,
-                    () => launcherSearchBox.Text == "项目文件"
-                        && launcherResults.Items.Count == 1))
+                    () => launcherSearchBox.Text.Length == 0
+                        && launcherResults.Items.Count == 0))
             {
-                Console.Error.WriteLine("Clipboard match was not shown in the quick launcher.");
+                Console.Error.WriteLine("Quick launcher should open empty without reading clipboard text.");
+                return 2;
+            }
+
+            if (clipboard.ReadCount != 0)
+            {
+                Console.Error.WriteLine("Quick launcher read clipboard text during normal open.");
                 return 2;
             }
 
@@ -79,7 +85,7 @@ internal static class Program
             {
                 var launcherState = launcherWindow.DataContext as QuickLauncherViewModel;
                 Console.Error.WriteLine(
-                    "Unmatched clipboard text was not cleared from the quick launcher. "
+                    "Quick launcher did not stay empty when clipboard text changed. "
                     + $"TextBox='{launcherSearchBox.Text}', Items={launcherResults.Items.Count}, "
                     + $"ViewModelText='{launcherState?.SearchText}', "
                     + $"ViewModelItems={launcherState?.Results.Count}, "
@@ -249,8 +255,16 @@ sealed class MutableClipboardTextReader(string? text) : IClipboardTextReader
 {
     public string? Text { get; set; } = text;
 
+    public int ReadCount { get; private set; }
+
     public PlatformOperationResult<string?> ReadText() =>
-        PlatformOperationResult<string?>.Succeeded(Text);
+        PlatformOperationResult<string?>.Succeeded(Read());
+
+    private string? Read()
+    {
+        ReadCount++;
+        return Text;
+    }
 }
 
 sealed class SuccessfulFolderOpener : IFolderOpener
