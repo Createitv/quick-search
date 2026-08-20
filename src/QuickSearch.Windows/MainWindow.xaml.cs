@@ -1292,8 +1292,8 @@ public partial class MainWindow : Window, IDisposable
         {
             if (source is TextBox
                 or Button
-                or ContextMenu
-                or MenuItem
+                or System.Windows.Controls.ContextMenu
+                or System.Windows.Controls.MenuItem
                 or TreeView
                 or ListBox
                 or ScrollBar)
