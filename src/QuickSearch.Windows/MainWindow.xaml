@@ -70,7 +70,8 @@
     <KeyBinding Key="Escape" Command="{Binding HideCommand}" />
   </Window.InputBindings>
 
-  <Grid Background="{DynamicResource PaperBrush}">
+  <Grid Background="{DynamicResource PaperBrush}"
+        MouseLeftButtonDown="WindowSurface_MouseLeftButtonDown">
     <Grid.RowDefinitions>
       <RowDefinition Height="44" />
       <RowDefinition Height="*" />
@@ -288,15 +289,25 @@
                   </Style>
                 </TextBlock.Style>
               </TextBlock>
-              <ItemsControl ItemsSource="{Binding Explorer.CurrentRules}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Button Style="{StaticResource RuleRowButtonStyle}"
+              <ItemsControl x:Name="CurrentRulesList"
+                            ItemsSource="{Binding Explorer.CurrentRules}"
+                            SizeChanged="CurrentRulesList_SizeChanged">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Width="{Binding CurrentRuleItemWidth, RelativeSource={RelativeSource AncestorType=Window}}"
+                          Style="{StaticResource RuleRowButtonStyle}"
                           Command="{Binding DataContext.Explorer.OpenRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                           CommandParameter="{Binding}"
-                          PreviewMouseLeftButtonDown="Rule_PreviewMouseLeftButtonDown"
-                          PreviewMouseMove="Rule_PreviewMouseMove"
-                          ToolTip="单击打开；拖到左侧文件夹或右键可移动">
+                          AllowDrop="True"
+                          DragOver="Rule_DragOver"
+                          DragLeave="Rule_DragLeave"
+                          Drop="Rule_Drop"
+                          ToolTip="单击打开；拖住左侧手柄可排序或拖到文件夹">
                     <Button.ContextMenu>
                       <ContextMenu Opened="RuleContextMenu_Opened">
                         <MenuItem Header="打开文件夹" Click="RuleContextOpen_Click">
@@ -323,10 +334,17 @@
                         </MenuItem>
                       </ContextMenu>
                     </Button.ContextMenu>
-                    <Grid>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                      <ui:SymbolIcon Margin="0,0,11,0" Symbol="ReOrderDotsVertical20" FontSize="18"
-                                     Foreground="{DynamicResource SlateBrush}" />
+                      <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <Border Width="30" Margin="-4,0,7,0" Cursor="SizeAll"
+                                Background="{DynamicResource TransparentBrush}"
+                                PreviewMouseLeftButtonDown="RuleHandle_PreviewMouseLeftButtonDown"
+                                PreviewMouseMove="RuleHandle_PreviewMouseMove"
+                                ToolTip="拖动排序">
+                          <ui:SymbolIcon HorizontalAlignment="Center" VerticalAlignment="Center"
+                                         Symbol="ReOrderDotsVertical20" FontSize="18"
+                                         Foreground="{DynamicResource SlateBrush}" />
+                        </Border>
                       <StackPanel Grid.Column="1">
                         <TextBlock Text="{Binding DisplayTitle}" FontSize="14" FontWeight="SemiBold" />
                         <TextBlock Margin="0,4,20,0" Text="{Binding FolderPath}" Foreground="{DynamicResource SlateBrush}" FontSize="12" TextTrimming="CharacterEllipsis" />
@@ -336,10 +354,10 @@
                         <ui:SymbolIcon Symbol="OpenFolder20" FontSize="17"
                                        Foreground="{DynamicResource RouteBlueBrush}" />
                       </StackPanel>
-                    </Grid>
-                  </Button>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
               </ItemsControl>
             </Grid>
           </ScrollViewer>
@@ -531,7 +549,7 @@
           </Border>
           <StackPanel Grid.Column="2" VerticalAlignment="Center">
             <TextBlock Text="通用设置" Style="{StaticResource WindowTitleStyle}" />
-            <TextBlock Margin="0,3,0,0" Text="快捷键、启动行为和应用更新"
+            <TextBlock Margin="0,3,0,0" Text="快捷键、启动行为和显示布局"
                        Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </Grid>
@@ -598,8 +616,6 @@
             <StackPanel>
               <CheckBox Content="登录 Windows 后自动启动 QuickSearch"
                         IsChecked="{Binding StartWithWindows}" />
-              <CheckBox Margin="0,14,0,0" Content="每次启动时自动检查更新"
-                        IsChecked="{Binding AutomaticallyCheckForUpdates}" />
             </StackPanel>
           </Border>
 
@@ -612,7 +628,7 @@
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Text="快速启动器分栏" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Text="首页和启动器分栏" Style="{StaticResource FieldLabelStyle}" />
                 <ComboBox Margin="0,7,0,0"
                           SelectedValue="{Binding QuickLauncherResultColumns, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                           SelectedValuePath="Tag">
@@ -630,53 +646,6 @@
                   <Run Text="{Binding UiFontSize, StringFormat={}{0:0}}" />
                   <Run Text=" pt" />
                 </TextBlock>
-              </StackPanel>
-            </Grid>
-          </Border>
-
-          <TextBlock Text="应用更新" Style="{StaticResource SectionTitleStyle}" />
-          <Border Margin="0,10,0,0" Style="{StaticResource SurfaceCardStyle}">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-              </Grid.ColumnDefinitions>
-              <Border Width="42" Height="42" Margin="0,0,14,0" CornerRadius="12"
-                      Background="{DynamicResource SoftBlueBrush}">
-                <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="21"
-                               Foreground="{DynamicResource RouteBlueBrush}" />
-              </Border>
-              <StackPanel Grid.Column="1">
-                <TextBlock FontWeight="SemiBold">
-                  <Run Text="当前版本 " /><Run Text="{Binding Update.InstalledVersion, Mode=OneWay}" />
-                  <Run Text=" · 最新版本 " /><Run Text="{Binding Update.LatestVersion, Mode=OneWay}" />
-                </TextBlock>
-                <TextBlock Margin="0,4,0,0" Text="{Binding Update.StatusText}"
-                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
-                <TextBlock Margin="0,3,0,0"
-                           Text="更新检查与下载默认跟随 Windows 系统代理。代理软件需开启“系统代理”模式。"
-                           TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
-                <ProgressBar Margin="0,12,0,0" Height="4" Minimum="0" Maximum="1"
-                             Value="{Binding Update.DownloadProgress, Mode=OneWay}" />
-              </StackPanel>
-              <StackPanel Grid.Column="2" Margin="18,0,0,0" Orientation="Horizontal"
-                          VerticalAlignment="Top">
-                <Button Style="{StaticResource QuietButtonStyle}"
-                        Command="{Binding Update.CheckNowCommand}">
-                  <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowSync20" FontSize="16" />
-                    <TextBlock Text="检查更新" />
-                  </StackPanel>
-                </Button>
-                <Button Margin="8,0,0,0" Style="{StaticResource PrimaryButtonStyle}"
-                        IsEnabled="{Binding Update.CanDownloadAndInstall}"
-                        Click="Settings_DownloadAndInstall_Click">
-                  <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Margin="0,0,6,0" Symbol="ArrowDownload20" FontSize="16" />
-                    <TextBlock Text="下载并安装" Foreground="White" />
-                  </StackPanel>
-                </Button>
               </StackPanel>
             </Grid>
           </Border>
@@ -837,6 +806,18 @@
         </StackPanel>
         <TextBlock Grid.Column="1" Margin="18,0" Text="{Binding Status}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource SlateBrush}" />
         <StackPanel Grid.Column="2" Orientation="Horizontal">
+          <Button Width="34" Height="34" Padding="0" Margin="0,0,4,0"
+                  ToolTip="首页布局" AutomationProperties.Name="首页布局"
+                  Style="{StaticResource BottomGearButtonStyle}" Click="RuleLayout_Click">
+            <ui:SymbolIcon Symbol="Apps20" FontSize="18" />
+            <Button.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="一栏" Tag="1" Click="RuleLayoutMenuItem_Click" />
+                <MenuItem Header="两栏" Tag="2" Click="RuleLayoutMenuItem_Click" />
+                <MenuItem Header="三栏" Tag="3" Click="RuleLayoutMenuItem_Click" />
+              </ContextMenu>
+            </Button.ContextMenu>
+          </Button>
           <Button Width="34" Height="34" Padding="0" Margin="0,0,4,0"
                   ToolTip="打开快速启动器" AutomationProperties.Name="打开快速启动器"
                   Style="{StaticResource BottomGearButtonStyle}" Click="QuickLauncher_Click">

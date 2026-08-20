@@ -14,7 +14,6 @@ public sealed class SettingsViewModel : ObservableObject
     private string _shortcut = string.Empty;
     private string _launcherShortcut = string.Empty;
     private bool _startWithWindows;
-    private bool _automaticallyCheckForUpdates;
     private int _quickLauncherResultColumns;
     private double _uiFontSize;
     private string _everythingHealthText = string.Empty;
@@ -32,7 +31,6 @@ public sealed class SettingsViewModel : ObservableObject
         IHotkeyRegistration hotkey,
         IStartupRegistration startup,
         IFolderSearch search,
-        ApplicationUpdateViewModel? update = null,
         IHotkeyRegistration? launcherHotkey = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -48,7 +46,6 @@ public sealed class SettingsViewModel : ObservableObject
             "启动器快捷键服务尚未就绪。");
         _startup = startup;
         _search = search;
-        Update = update;
         Organizer = new NavigationOrganizerViewModel(configuration);
 
         AddMappingCommand = new RelayCommand(AddMapping);
@@ -76,8 +73,6 @@ public sealed class SettingsViewModel : ObservableObject
     public ObservableCollection<MappingGroupEditorViewModel> Mappings => MappingGroups;
 
     public NavigationOrganizerViewModel Organizer { get; }
-
-    public ApplicationUpdateViewModel? Update { get; }
 
     public IReadOnlyList<MappingGroupEditorViewModel> FilteredMappingGroups
     {
@@ -122,12 +117,6 @@ public sealed class SettingsViewModel : ObservableObject
     {
         get => _startWithWindows;
         set => SetProperty(ref _startWithWindows, value);
-    }
-
-    public bool AutomaticallyCheckForUpdates
-    {
-        get => _automaticallyCheckForUpdates;
-        set => SetProperty(ref _automaticallyCheckForUpdates, value);
     }
 
     public int QuickLauncherResultColumns
@@ -206,8 +195,6 @@ public sealed class SettingsViewModel : ObservableObject
         Shortcut = _configuration.Settings.GlobalShortcut;
         LauncherShortcut = _configuration.Settings.QuickLauncherShortcut;
         StartWithWindows = _configuration.Settings.StartWithWindows;
-        AutomaticallyCheckForUpdates =
-            _configuration.Settings.AutomaticallyCheckForUpdates;
         QuickLauncherResultColumns = Math.Clamp(
             _configuration.Settings.QuickLauncherResultColumns,
             1,
@@ -400,7 +387,6 @@ public sealed class SettingsViewModel : ObservableObject
             GlobalShortcut = shortcut,
             QuickLauncherShortcut = launcherShortcut,
             StartWithWindows = StartWithWindows,
-            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates,
             QuickLauncherResultColumns = QuickLauncherResultColumns,
             UiFontSize = UiFontSize
         };

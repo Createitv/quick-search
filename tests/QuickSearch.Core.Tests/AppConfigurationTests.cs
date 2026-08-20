@@ -85,6 +85,46 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
+    public void ReorderRuleRelative_UpdatesShortcutOrderWithinFolder()
+    {
+        var configuration = new AppConfiguration();
+        var folder = configuration.AddNavigationFolder("项目", parentId: null);
+        var first = configuration.AddRule("一", ["one"], @"C:\One", folder.Id);
+        var second = configuration.AddRule("二", ["two"], @"C:\Two", folder.Id);
+        var third = configuration.AddRule("三", ["three"], @"C:\Three", folder.Id);
+
+        configuration.ReorderRuleRelative(third.Id, first.Id, placeAfterTarget: false);
+
+        Assert.Equal(
+            [third.Id, first.Id, second.Id],
+            configuration.Rules
+                .Where(rule => rule.NavigationFolderId == folder.Id)
+                .OrderBy(rule => rule.SortOrder)
+                .Select(rule => rule.Id));
+    }
+
+    [Fact]
+    public void ReorderRuleRelative_MovesShortcutToTargetFolder()
+    {
+        var configuration = new AppConfiguration();
+        var sourceFolder = configuration.AddNavigationFolder("来源", parentId: null);
+        var targetFolder = configuration.AddNavigationFolder("目标", parentId: null);
+        var moved = configuration.AddRule("移动", ["move"], @"C:\Move", sourceFolder.Id);
+        var target = configuration.AddRule("目标", ["target"], @"C:\Target", targetFolder.Id);
+        var after = configuration.AddRule("后续", ["after"], @"C:\After", targetFolder.Id);
+
+        configuration.ReorderRuleRelative(moved.Id, target.Id, placeAfterTarget: true);
+
+        Assert.Empty(configuration.Rules.Where(rule => rule.NavigationFolderId == sourceFolder.Id));
+        Assert.Equal(
+            [target.Id, moved.Id, after.Id],
+            configuration.Rules
+                .Where(rule => rule.NavigationFolderId == targetFolder.Id)
+                .OrderBy(rule => rule.SortOrder)
+                .Select(rule => rule.Id));
+    }
+
+    [Fact]
     public void MoveNavigationFolderRelative_MovesAcrossParentsBeforeTarget()
     {
         var configuration = new AppConfiguration();

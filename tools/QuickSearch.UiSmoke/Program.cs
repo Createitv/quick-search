@@ -23,9 +23,6 @@ internal static class Program
                 _ => true);
             var bootstrap = new EverythingBootstrapViewModel(
                 new ReadyEverythingInstallationManager());
-            var update = new ApplicationUpdateViewModel(
-                new CurrentApplicationUpdateService(),
-                "0.0.4");
             var clipboard = new MutableClipboardTextReader("项目文件");
             var mainWindow = new MainWindow(
                 launcher,
@@ -33,7 +30,6 @@ internal static class Program
                 search,
                 new SuccessfulStartupRegistration(),
                 bootstrap,
-                update,
                 launcherClipboard: clipboard);
             application.MainWindow = mainWindow;
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
@@ -284,21 +280,4 @@ sealed class ReadyEverythingInstallationManager : IEverythingInstallationManager
     public Task<EverythingBootstrapResult> InstallAndStartAsync(
         CancellationToken cancellationToken = default) =>
         CheckAndStartAsync(cancellationToken);
-}
-
-sealed class CurrentApplicationUpdateService : IApplicationUpdateService
-{
-    public Task<ApplicationUpdateCheck> CheckAsync(
-        AppReleaseVersion installedVersion,
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(ApplicationUpdateCheck.Current(installedVersion.ToString()));
-
-    public Task<string> DownloadAndVerifyAsync(
-        ApplicationRelease release,
-        IProgress<double>? progress = null,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
-
-    public PlatformOperationResult LaunchInstaller(string installerPath) =>
-        PlatformOperationResult.Failed("Not available in UI smoke test.");
 }

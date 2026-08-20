@@ -43,6 +43,11 @@ public sealed class RuleExplorerViewModel : ObservableObject
                 request.FolderId,
                 request.TargetFolderId,
                 request.PlaceAfterTarget));
+        ReorderRuleCommand = new AsyncRelayCommand<RuleReorderRequest>(request =>
+            ReorderRuleRelativeAsync(
+                request.RuleId,
+                request.TargetRuleId,
+                request.PlaceAfterTarget));
         MoveFolderCommand = new AsyncRelayCommand<FolderMoveRequest>(request =>
             MoveFolderAsync(
                 request.FolderId,
@@ -139,6 +144,11 @@ public sealed class RuleExplorerViewModel : ObservableObject
 
     public bool HasLocalSearchResults => SearchResults.Count > 0;
 
+    public int RuleColumns => Math.Clamp(
+        _configuration.Settings.QuickLauncherResultColumns,
+        1,
+        3);
+
     public RelayCommand<NavigationFolder> NavigateFolderCommand { get; }
 
     public AsyncRelayCommand<FolderRule> OpenRuleCommand { get; }
@@ -148,6 +158,8 @@ public sealed class RuleExplorerViewModel : ObservableObject
     public AsyncRelayCommand<NavigationFolder> UnpinFolderCommand { get; }
 
     public AsyncRelayCommand<PinMoveRequest> ReorderPinnedFolderCommand { get; }
+
+    public AsyncRelayCommand<RuleReorderRequest> ReorderRuleCommand { get; }
 
     public AsyncRelayCommand<FolderMoveRequest> MoveFolderCommand { get; }
 
@@ -208,6 +220,38 @@ public sealed class RuleExplorerViewModel : ObservableObject
                 placeAfterTarget),
             "收藏顺序已保存。",
             "无法保存收藏顺序");
+
+    public async Task ReorderRuleRelativeAsync(
+        Guid ruleId,
+        Guid targetRuleId,
+        bool placeAfterTarget) =>
+        await ApplyImmediateAsync(
+            candidate => candidate.ReorderRuleRelative(
+                ruleId,
+                targetRuleId,
+                placeAfterTarget),
+            "快捷导航顺序已保存。",
+            "无法保存快捷导航顺序");
+
+    public async Task SetRuleColumnsAsync(int columns)
+    {
+        var normalized = Math.Clamp(columns, 1, 3);
+        if (normalized == RuleColumns)
+        {
+            return;
+        }
+
+        await ApplyImmediateAsync(
+            candidate =>
+            {
+                candidate.Settings = candidate.Settings with
+                {
+                    QuickLauncherResultColumns = normalized
+                };
+            },
+            $"已切换为{normalized}栏布局。",
+            "无法保存布局");
+    }
 
     public async Task MoveRuleAsync(Guid ruleId, Guid targetFolderId)
     {
@@ -499,6 +543,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
     private void RefreshVisibleContent()
     {
         OnPropertyChanged(nameof(CurrentFolder));
+        OnPropertyChanged(nameof(RuleColumns));
         Breadcrumbs = BuildFolderPath(_currentFolderId);
         ChildFolders = _configuration.NavigationFolders
             .Where(folder => folder.ParentId == _currentFolderId)

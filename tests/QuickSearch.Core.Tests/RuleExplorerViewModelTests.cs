@@ -136,6 +136,56 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task ReorderRuleRelativeAsync_PersistsCurrentFolderOrder()
+    {
+        var configuration = CreateConfiguration();
+        var development = configuration.NavigationFolders.Single(folder =>
+            folder.Name == "开发");
+        var second = configuration.AddRule(
+            "脚本",
+            ["script"],
+            @"F:\Github\客户\小溪\scripts",
+            development.Id);
+        var third = configuration.AddRule(
+            "资料",
+            ["docs"],
+            @"F:\Github\客户\小溪\docs",
+            development.Id);
+        var first = configuration.Rules.Single(rule =>
+            rule.DisplayTitle == "Quick Search 代码");
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        viewModel.NavigateToFolder(development.Id);
+
+        await viewModel.ReorderRuleRelativeAsync(third.Id, first.Id, placeAfterTarget: false);
+
+        Assert.Equal(
+            [third.Id, first.Id, second.Id],
+            viewModel.CurrentRules.Select(rule => rule.Id));
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
+    public async Task SetRuleColumnsAsync_PersistsLayoutPreference()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+
+        await viewModel.SetRuleColumnsAsync(3);
+
+        Assert.Equal(3, viewModel.RuleColumns);
+        Assert.Equal(3, configuration.Settings.QuickLauncherResultColumns);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
     public async Task CreateAndRenameFolderAsync_RefreshTreeAndRejectSameParentDuplicate()
     {
         var configuration = CreateConfiguration();

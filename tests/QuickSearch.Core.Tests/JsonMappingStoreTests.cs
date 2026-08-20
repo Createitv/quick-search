@@ -52,7 +52,6 @@ public sealed class JsonMappingStoreTests
 
         Assert.Equal("Ctrl+Alt+F", configuration.Settings.GlobalShortcut);
         Assert.True(configuration.Settings.StartWithWindows);
-        Assert.True(configuration.Settings.AutomaticallyCheckForUpdates);
         Assert.Empty(configuration.Mappings);
     }
 
@@ -68,16 +67,7 @@ public sealed class JsonMappingStoreTests
             {
                 GlobalShortcut = "Ctrl+Shift+G",
                 StartWithWindows = false,
-                AutomaticallyCheckForUpdates = false,
-                HasCompletedOnboarding = true,
-                LastUpdateCheckAtUtc = new DateTimeOffset(
-                    2026,
-                    8,
-                    12,
-                    6,
-                    30,
-                    0,
-                    TimeSpan.Zero)
+                HasCompletedOnboarding = true
             }
         };
         configuration.UpsertMapping("Northwind Billing", @"C:\Clients\Northwind");
@@ -88,11 +78,7 @@ public sealed class JsonMappingStoreTests
 
         Assert.Equal("Ctrl+Shift+G", loaded.Settings.GlobalShortcut);
         Assert.False(loaded.Settings.StartWithWindows);
-        Assert.False(loaded.Settings.AutomaticallyCheckForUpdates);
         Assert.True(loaded.Settings.HasCompletedOnboarding);
-        Assert.Equal(
-            new DateTimeOffset(2026, 8, 12, 6, 30, 0, TimeSpan.Zero),
-            loaded.Settings.LastUpdateCheckAtUtc);
         Assert.Equal(configuration.Mappings, loaded.Mappings);
         Assert.Equal(
             configuration.Rules.Select(rule => (

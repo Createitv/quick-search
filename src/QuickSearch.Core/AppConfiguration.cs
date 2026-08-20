@@ -314,6 +314,51 @@ public sealed class AppConfiguration
         return moved;
     }
 
+    public FolderRule ReorderRuleRelative(
+        Guid ruleId,
+        Guid targetRuleId,
+        bool placeAfterTarget)
+    {
+        var sourceIndex = GetRuleIndex(ruleId);
+        var source = _rules[sourceIndex];
+        var target = _rules[GetRuleIndex(targetRuleId)];
+        if (source.Id == target.Id)
+        {
+            return source;
+        }
+
+        var targetFolderId = target.NavigationFolderId;
+        var updated = source with
+        {
+            NavigationFolderId = targetFolderId,
+            UpdatedAtUtc = UtcNow()
+        };
+        var siblings = _rules
+            .Where(rule => rule.NavigationFolderId == targetFolderId && rule.Id != ruleId)
+            .OrderBy(rule => rule.SortOrder)
+            .ThenBy(rule => rule.DisplayTitle, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var relativeIndex = siblings.FindIndex(rule => rule.Id == targetRuleId);
+        if (relativeIndex < 0)
+        {
+            throw new InvalidOperationException("目标快捷导航不存在。");
+        }
+
+        siblings.Insert(placeAfterTarget ? relativeIndex + 1 : relativeIndex, updated);
+        for (var order = 0; order < siblings.Count; order++)
+        {
+            var index = GetRuleIndex(siblings[order].Id);
+            _rules[index] = siblings[order] with { SortOrder = order };
+        }
+
+        if (source.NavigationFolderId != targetFolderId)
+        {
+            NormalizeRuleOrder(source.NavigationFolderId);
+        }
+
+        return _rules[GetRuleIndex(ruleId)];
+    }
+
     public void PinFolder(Guid folderId)
     {
         ValidateFolderExists(folderId);

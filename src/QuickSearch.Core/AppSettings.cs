@@ -10,11 +10,7 @@ public sealed record AppSettings
 
     public bool StartWithWindows { get; init; } = true;
 
-    public bool AutomaticallyCheckForUpdates { get; init; } = true;
-
     public bool HasCompletedOnboarding { get; init; }
-
-    public DateTimeOffset? LastUpdateCheckAtUtc { get; init; }
 
     public int QuickLauncherResultColumns { get; init; } = 1;
 

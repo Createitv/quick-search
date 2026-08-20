@@ -7,7 +7,7 @@
         Title="快速启动器" Width="720" Height="560"
         MinWidth="520" MinHeight="390" MaxWidth="1200"
         WindowStyle="None" ResizeMode="CanResizeWithGrip"
-        Background="Transparent"
+        Background="{DynamicResource PaperBrush}"
         FontSize="{DynamicResource AppFontSize}"
         ShowInTaskbar="False" Topmost="True"
         SizeChanged="Window_SizeChanged"
@@ -49,12 +49,8 @@
     </Style>
   </Window.Resources>
 
-  <Border Margin="14" Background="{DynamicResource PaperBrush}"
-          BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
-          CornerRadius="14">
-    <Border.Effect>
-      <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.24" Color="#334155" />
-    </Border.Effect>
+  <Border Margin="0" Background="{DynamicResource PaperBrush}"
+          BorderThickness="0" CornerRadius="0">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="76" />
@@ -63,7 +59,7 @@
       </Grid.RowDefinitions>
 
       <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
-              CornerRadius="14,14,0,0" Background="{DynamicResource PaperBrush}"
+              Background="{DynamicResource PaperBrush}"
               MouseLeftButtonDown="Header_MouseLeftButtonDown">
         <Grid Margin="20,12,14,12">
           <Grid.ColumnDefinitions>
@@ -172,7 +168,7 @@
 
       <Border Grid.Row="2" Padding="18,0,9,0" Background="{DynamicResource MutedSurfaceBrush}"
               BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0"
-              CornerRadius="0,0,14,14">
+              CornerRadius="0">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
@@ -182,18 +178,21 @@
                      Foreground="{DynamicResource SlateBrush}" VerticalAlignment="Center"
                      TextTrimming="CharacterEllipsis" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-            <Border Margin="12,0,7,0" Padding="9,4" CornerRadius="7"
+            <Border Margin="12,0,7,0" Padding="9,0" Height="32" CornerRadius="7"
+                    VerticalAlignment="Center"
                     Background="{DynamicResource PaperBrush}"
                     BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
                     AutomationProperties.Name="启动器快捷键">
-              <StackPanel Orientation="Horizontal">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <ui:SymbolIcon Margin="0,0,6,0" Symbol="DesktopKeyboard20" FontSize="14"
+                               VerticalAlignment="Center"
                                Foreground="{DynamicResource RouteBlueBrush}" />
                 <TextBlock Text="{Binding LauncherShortcutText}" FontSize="11" FontWeight="SemiBold"
-                           Foreground="{DynamicResource SlateBrush}" />
+                           VerticalAlignment="Center" Foreground="{DynamicResource SlateBrush}" />
               </StackPanel>
             </Border>
             <Button Width="34" Height="32" Padding="0" Margin="0,0,4,0"
+                    VerticalAlignment="Center"
                     ToolTip="结果布局" Style="{StaticResource QuietButtonStyle}"
                     Click="Layout_Click">
               <ui:SymbolIcon Symbol="Apps20" FontSize="17" />
@@ -206,6 +205,7 @@
               </Button.ContextMenu>
             </Button>
             <Button Width="34" Height="32" Padding="0"
+                    VerticalAlignment="Center"
                     ToolTip="启动器设置" Style="{StaticResource QuietButtonStyle}"
                     Click="Settings_Click">
               <ui:SymbolIcon Symbol="Settings20" FontSize="17" />

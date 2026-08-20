@@ -10,19 +10,33 @@ using Point = System.Windows.Point;
 using Border = System.Windows.Controls.Border;
 using Button = System.Windows.Controls.Button;
 using ContextMenu = System.Windows.Controls.ContextMenu;
+using Control = System.Windows.Controls.Control;
+using Grid = System.Windows.Controls.Grid;
+using ItemsControl = System.Windows.Controls.ItemsControl;
+using ListBox = System.Windows.Controls.ListBox;
 using MenuItem = System.Windows.Controls.MenuItem;
+using Panel = System.Windows.Controls.Panel;
+using ScrollBar = System.Windows.Controls.Primitives.ScrollBar;
+using TextBox = System.Windows.Controls.TextBox;
+using TreeView = System.Windows.Controls.TreeView;
 using Wpf.Ui.Controls;
 
 namespace QuickSearch.Windows;
 
 public partial class MainWindow : Window, IDisposable
 {
+    public static readonly DependencyProperty CurrentRuleItemWidthProperty =
+        DependencyProperty.Register(
+            nameof(CurrentRuleItemWidth),
+            typeof(double),
+            typeof(MainWindow),
+            new PropertyMetadata(560d));
+
     private readonly LauncherViewModel _viewModel;
     private readonly IMappingStore _store;
     private readonly IFolderSearch _search;
     private readonly IStartupRegistration _startup;
     private readonly EverythingBootstrapViewModel _bootstrap;
-    private readonly ApplicationUpdateViewModel _update;
     private IHotkeyRegistration? _hotkey;
     private GlobalHotkey? _globalHotkey;
     private IHotkeyRegistration? _launcherHotkey;
@@ -47,7 +61,6 @@ public partial class MainWindow : Window, IDisposable
         IFolderSearch search,
         IStartupRegistration startup,
         EverythingBootstrapViewModel bootstrap,
-        ApplicationUpdateViewModel update,
         IQuickLauncherSearch? launcherSearch = null,
         IPathOpener? pathOpener = null,
         IClipboardTextReader? launcherClipboard = null)
@@ -57,13 +70,11 @@ public partial class MainWindow : Window, IDisposable
         ArgumentNullException.ThrowIfNull(search);
         ArgumentNullException.ThrowIfNull(startup);
         ArgumentNullException.ThrowIfNull(bootstrap);
-        ArgumentNullException.ThrowIfNull(update);
         _viewModel = viewModel;
         _store = store;
         _search = search;
         _startup = startup;
         _bootstrap = bootstrap;
-        _update = update;
         _quickLauncherViewModel = new QuickLauncherViewModel(
             _viewModel.Configuration,
             _store,
@@ -74,34 +85,23 @@ public partial class MainWindow : Window, IDisposable
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;
         _viewModel.ShowSettingsRequested += ViewModel_ShowSettingsRequested;
+        _viewModel.Explorer.PropertyChanged += Explorer_PropertyChanged;
         SourceInitialized += MainWindow_SourceInitialized;
     }
 
     public EverythingBootstrapViewModel Bootstrap => _bootstrap;
 
-    public ApplicationUpdateViewModel Update => _update;
+    public double CurrentRuleItemWidth
+    {
+        get => (double)GetValue(CurrentRuleItemWidthProperty);
+        set => SetValue(CurrentRuleItemWidthProperty, value);
+    }
 
     public async Task InitializeAsync()
     {
         await _viewModel.InitializeAsync();
         ApplyInitialPlatformSettings();
-    }
-
-    public async Task CheckForUpdatesOnStartupAsync()
-    {
-        var settings = _viewModel.Configuration.Settings;
-        if (!UpdateCheckPolicy.ShouldCheckAutomatically(
-                settings.AutomaticallyCheckForUpdates))
-        {
-            return;
-        }
-
-        await _update.CheckNowAsync();
-        if (_update.State == ApplicationUpdateState.Available)
-        {
-            _viewModel.ReportStatus(
-                $"发现 QuickSearch {_update.LatestVersion}，可在设置中安装。");
-        }
+        UpdateRuleLayoutWidth();
     }
 
     public async Task ActivateFromClipboardAsync()
@@ -158,7 +158,6 @@ public partial class MainWindow : Window, IDisposable
                 _hotkey,
                 _startup,
                 _search,
-                _update,
                 _launcherHotkey);
             _settingsViewModel.Saved += SettingsViewModel_Saved;
             _settingsViewModel.HideRequested += SettingsViewModel_HideRequested;
@@ -227,6 +226,7 @@ public partial class MainWindow : Window, IDisposable
     {
         _viewModel.HideRequested -= ViewModel_HideRequested;
         _viewModel.ShowSettingsRequested -= ViewModel_ShowSettingsRequested;
+        _viewModel.Explorer.PropertyChanged -= Explorer_PropertyChanged;
         if (_settingsViewModel is not null)
         {
             _settingsViewModel.Saved -= SettingsViewModel_Saved;
@@ -354,6 +354,17 @@ public partial class MainWindow : Window, IDisposable
         _viewModel.RefreshConfiguration();
         FontSizeResources.Apply(_viewModel.Configuration.Settings.UiFontSize);
         _quickLauncherViewModel.RefreshSettings();
+        UpdateRuleLayoutWidth();
+    }
+
+    private void Explorer_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (string.Equals(e.PropertyName, nameof(RuleExplorerViewModel.RuleColumns), StringComparison.Ordinal)
+            || string.Equals(e.PropertyName, nameof(RuleExplorerViewModel.CurrentRules), StringComparison.Ordinal))
+        {
+            UpdateRuleLayoutWidth();
+            _quickLauncherViewModel.RefreshSettings();
+        }
     }
 
     private void SettingsViewModel_HideRequested(object? sender, EventArgs e) =>
@@ -384,7 +395,19 @@ public partial class MainWindow : Window, IDisposable
             return;
         }
 
-        DragMove();
+        BeginWindowDrag(e);
+    }
+
+    private void WindowSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ButtonState != MouseButtonState.Pressed
+            || e.ClickCount != 1
+            || IsInteractiveDragSource(e.OriginalSource as DependencyObject))
+        {
+            return;
+        }
+
+        BeginWindowDrag(e);
     }
 
     private void MinimizeWindow_Click(object sender, RoutedEventArgs e) =>
@@ -395,6 +418,31 @@ public partial class MainWindow : Window, IDisposable
     private void CloseWindow_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void QuickLauncher_Click(object sender, RoutedEventArgs e) => ShowQuickLauncher();
+
+    private void CurrentRulesList_SizeChanged(object sender, SizeChangedEventArgs e) =>
+        UpdateRuleLayoutWidth();
+
+    private void RuleLayout_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+        }
+    }
+
+    private async void RuleLayoutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as MenuItem)?.Tag is not string value
+            || !int.TryParse(value, out var columns))
+        {
+            return;
+        }
+
+        await _viewModel.Explorer.SetRuleColumnsAsync(columns);
+        UpdateRuleLayoutWidth();
+        _quickLauncherViewModel.RefreshSettings();
+    }
 
     private void CollapseSidebar_Click(object sender, RoutedEventArgs e)
     {
@@ -572,6 +620,13 @@ public partial class MainWindow : Window, IDisposable
         _draggedRule = ResolveFolderRule((sender as FrameworkElement)?.DataContext);
     }
 
+    private void RuleHandle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _ruleDragStart = e.GetPosition(this);
+        _draggedRule = ResolveFolderRule((sender as FrameworkElement)?.DataContext);
+        e.Handled = true;
+    }
+
     private void Rule_PreviewMouseMove(object sender, MouseEventArgs e)
     {
         if (e.LeftButton != MouseButtonState.Pressed || _draggedRule is null)
@@ -594,6 +649,47 @@ public partial class MainWindow : Window, IDisposable
         {
             _draggedRule = null;
         }
+    }
+
+    private void RuleHandle_PreviewMouseMove(object sender, MouseEventArgs e) =>
+        Rule_PreviewMouseMove(sender, e);
+
+    private void Rule_DragOver(object sender, DragEventArgs e)
+    {
+        if (sender is not Button targetButton
+            || targetButton.DataContext is not FolderRule target
+            || e.Data.GetData(typeof(FolderRule)) is not FolderRule source
+            || source.Id == target.Id)
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+
+        targetButton.BorderBrush = FindResource("RouteBlueBrush") as System.Windows.Media.Brush;
+        targetButton.BorderThickness = GetRuleDropBorder(targetButton, e);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void Rule_DragLeave(object sender, DragEventArgs e) =>
+        ResetRuleDropIndicator(sender as Button);
+
+    private void Rule_Drop(object sender, DragEventArgs e)
+    {
+        if (sender is not Button targetButton
+            || targetButton.DataContext is not FolderRule target
+            || e.Data.GetData(typeof(FolderRule)) is not FolderRule source
+            || source.Id == target.Id)
+        {
+            return;
+        }
+
+        var placeAfterTarget = ShouldPlaceRuleAfterTarget(targetButton, e);
+        ResetRuleDropIndicator(targetButton);
+        _viewModel.Explorer.ReorderRuleCommand.Execute(
+            new RuleReorderRequest(source.Id, target.Id, placeAfterTarget));
+        _draggedRule = null;
+        e.Handled = true;
     }
 
     private void RuleContextMenu_Opened(object sender, RoutedEventArgs e)
@@ -1122,30 +1218,100 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async void Settings_DownloadAndInstall_Click(object sender, RoutedEventArgs e)
-    {
-        if (_settingsViewModel?.Update is null
-            || !_settingsViewModel.Update.CanDownloadAndInstall)
-        {
-            return;
-        }
-
-        var choice = System.Windows.MessageBox.Show(
-            $"将下载并安装 QuickSearch {_settingsViewModel.Update.LatestVersion}。\n\n"
-            + "安装包通过 SHA-256 校验后，QuickSearch 会退出并完成更新。是否继续？",
-            "安装更新",
-            System.Windows.MessageBoxButton.YesNo,
-            System.Windows.MessageBoxImage.Information);
-        if (choice == System.Windows.MessageBoxResult.Yes)
-        {
-            await _settingsViewModel.Update.DownloadAndInstallAsync();
-        }
-    }
-
     private void FocusSearch()
     {
         SearchBox.Focus();
         SearchBox.SelectAll();
+    }
+
+    private void UpdateRuleLayoutWidth()
+    {
+        if (CurrentRulesList.ActualWidth <= 0)
+        {
+            return;
+        }
+
+        var columns = Math.Clamp(_viewModel.Explorer.RuleColumns, 1, 3);
+        var available = Math.Max(260, CurrentRulesList.ActualWidth);
+        var gutter = columns * 8;
+        CurrentRuleItemWidth = Math.Max(240, Math.Floor((available - gutter) / columns));
+    }
+
+    private void BeginWindowDrag(MouseButtonEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized)
+        {
+            WindowState = WindowState.Normal;
+        }
+
+        try
+        {
+            DragMove();
+            e.Handled = true;
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private static Thickness GetRuleDropBorder(FrameworkElement target, DragEventArgs e) =>
+        ShouldPlaceRuleAfterTarget(target, e)
+            ? new Thickness(1, 1, 1, 3)
+            : new Thickness(1, 3, 1, 1);
+
+    private static bool ShouldPlaceRuleAfterTarget(FrameworkElement target, DragEventArgs e)
+    {
+        var position = e.GetPosition(target);
+        if (position.Y >= target.ActualHeight * 0.62)
+        {
+            return true;
+        }
+
+        if (position.Y <= target.ActualHeight * 0.38)
+        {
+            return false;
+        }
+
+        return position.X >= target.ActualWidth / 2;
+    }
+
+    private static void ResetRuleDropIndicator(Button? button)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        button.ClearValue(Border.BorderBrushProperty);
+        button.ClearValue(Border.BorderThicknessProperty);
+    }
+
+    private static bool IsInteractiveDragSource(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is TextBox
+                or Button
+                or ContextMenu
+                or MenuItem
+                or TreeView
+                or ListBox
+                or ScrollBar)
+            {
+                return true;
+            }
+
+            try
+            {
+                source = System.Windows.Media.VisualTreeHelper.GetParent(source);
+            }
+            catch (InvalidOperationException)
+            {
+                source = LogicalTreeHelper.GetParent(source);
+            }
+        }
+
+        return false;
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)
