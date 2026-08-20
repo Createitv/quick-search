@@ -1,4 +1,5 @@
 using System.Windows.Threading;
+using System.Windows.Shell;
 using QuickSearch.Core;
 using QuickSearch.Windows;
 
@@ -35,6 +36,13 @@ internal static class Program
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
             mainWindow.Show();
             mainWindow.UpdateLayout();
+            var mainWindowChrome = WindowChrome.GetWindowChrome(mainWindow);
+            if (mainWindowChrome is null || mainWindowChrome.CaptionHeight != 44)
+            {
+                Console.Error.WriteLine("Main window does not expose its 44px title bar as a native drag region.");
+                return 2;
+            }
+
             SynchronizationContext.SetSynchronizationContext(
                 new DispatcherSynchronizationContext(application.Dispatcher));
             mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);

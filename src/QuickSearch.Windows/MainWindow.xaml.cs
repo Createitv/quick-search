@@ -10,15 +10,7 @@ using Point = System.Windows.Point;
 using Border = System.Windows.Controls.Border;
 using Button = System.Windows.Controls.Button;
 using ContextMenu = System.Windows.Controls.ContextMenu;
-using Control = System.Windows.Controls.Control;
-using Grid = System.Windows.Controls.Grid;
-using ItemsControl = System.Windows.Controls.ItemsControl;
-using ListBox = System.Windows.Controls.ListBox;
 using MenuItem = System.Windows.Controls.MenuItem;
-using Panel = System.Windows.Controls.Panel;
-using ScrollBar = System.Windows.Controls.Primitives.ScrollBar;
-using TextBox = System.Windows.Controls.TextBox;
-using TreeView = System.Windows.Controls.TreeView;
 using Wpf.Ui.Controls;
 
 namespace QuickSearch.Windows;
@@ -385,29 +377,6 @@ public partial class MainWindow : Window, IDisposable
         {
             FocusSearch();
         }
-    }
-
-    private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ClickCount == 2)
-        {
-            ToggleMaximize();
-            return;
-        }
-
-        BeginWindowDrag(e);
-    }
-
-    private void WindowSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.ButtonState != MouseButtonState.Pressed
-            || e.ClickCount != 1
-            || IsInteractiveDragSource(e.OriginalSource as DependencyObject))
-        {
-            return;
-        }
-
-        BeginWindowDrag(e);
     }
 
     private void MinimizeWindow_Click(object sender, RoutedEventArgs e) =>
@@ -1237,23 +1206,6 @@ public partial class MainWindow : Window, IDisposable
         CurrentRuleItemWidth = Math.Max(240, Math.Floor((available - gutter) / columns));
     }
 
-    private void BeginWindowDrag(MouseButtonEventArgs e)
-    {
-        if (WindowState == WindowState.Maximized)
-        {
-            WindowState = WindowState.Normal;
-        }
-
-        try
-        {
-            DragMove();
-            e.Handled = true;
-        }
-        catch (InvalidOperationException)
-        {
-        }
-    }
-
     private static Thickness GetRuleDropBorder(FrameworkElement target, DragEventArgs e) =>
         ShouldPlaceRuleAfterTarget(target, e)
             ? new Thickness(1, 1, 1, 3)
@@ -1284,34 +1236,6 @@ public partial class MainWindow : Window, IDisposable
 
         button.ClearValue(Border.BorderBrushProperty);
         button.ClearValue(Border.BorderThicknessProperty);
-    }
-
-    private static bool IsInteractiveDragSource(DependencyObject? source)
-    {
-        while (source is not null)
-        {
-            if (source is TextBox
-                or Button
-                or System.Windows.Controls.ContextMenu
-                or System.Windows.Controls.MenuItem
-                or TreeView
-                or ListBox
-                or ScrollBar)
-            {
-                return true;
-            }
-
-            try
-            {
-                source = System.Windows.Media.VisualTreeHelper.GetParent(source);
-            }
-            catch (InvalidOperationException)
-            {
-                source = LogicalTreeHelper.GetParent(source);
-            }
-        }
-
-        return false;
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)

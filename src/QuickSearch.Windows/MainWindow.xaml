@@ -13,7 +13,7 @@
         PreviewKeyDown="Window_PreviewKeyDown"
         Closing="Window_Closing">
   <shell:WindowChrome.WindowChrome>
-    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+    <shell:WindowChrome CaptionHeight="44" ResizeBorderThickness="6"
                         CornerRadius="0" GlassFrameThickness="0" />
   </shell:WindowChrome.WindowChrome>
   <Window.Resources>
@@ -70,8 +70,7 @@
     <KeyBinding Key="Escape" Command="{Binding HideCommand}" />
   </Window.InputBindings>
 
-  <Grid Background="{DynamicResource PaperBrush}"
-        MouseLeftButtonDown="WindowSurface_MouseLeftButtonDown">
+  <Grid Background="{DynamicResource PaperBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="44" />
       <RowDefinition Height="*" />
@@ -79,7 +78,7 @@
     </Grid.RowDefinitions>
 
     <Border Grid.Row="0" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
-            Background="{DynamicResource PaperBrush}" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+            Background="{DynamicResource PaperBrush}">
       <Grid>
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="44" />
@@ -98,6 +97,7 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Button Margin="0,0,6,0" MinHeight="32" Padding="11,5"
+                        shell:WindowChrome.IsHitTestVisibleInChrome="True"
                         Style="{StaticResource PinnedFolderButtonStyle}"
                         Command="{Binding DataContext.Explorer.NavigateFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                         CommandParameter="{Binding}"
