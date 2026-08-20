@@ -54,7 +54,6 @@ public partial class QuickLauncherWindow : Window, IDisposable
         _openingSettings = false;
         _hideWhenDeactivated = hideWhenDeactivated;
         _viewModel.Reset();
-        _viewModel.PrefillFromClipboard();
         if (!_hasBeenShown)
         {
             var workArea = SystemParameters.WorkArea;
