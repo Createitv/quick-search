@@ -10,6 +10,8 @@ public sealed class AppConfigurationTests
         Assert.Equal(3, settings.SchemaVersion);
         Assert.Equal("Alt+K", settings.QuickLauncherShortcut);
         Assert.False(settings.HasCompletedOnboarding);
+        Assert.Equal(1, settings.QuickLauncherResultColumns);
+        Assert.Equal(14, settings.UiFontSize);
     }
 
     [Fact]
@@ -80,6 +82,29 @@ public sealed class AppConfigurationTests
             placeAfterTarget: false);
 
         Assert.Equal([first.Id, third.Id, second.Id], configuration.PinnedFolderIds);
+    }
+
+    [Fact]
+    public void MoveNavigationFolderRelative_MovesAcrossParentsBeforeTarget()
+    {
+        var configuration = new AppConfiguration();
+        var root = configuration.AddNavigationFolder("根", parentId: null);
+        var first = configuration.AddNavigationFolder("一", root.Id);
+        var second = configuration.AddNavigationFolder("二", root.Id);
+        var moved = configuration.AddNavigationFolder("移动", parentId: null);
+
+        configuration.MoveNavigationFolderRelative(
+            moved.Id,
+            second.Id,
+            placeAfterTarget: false);
+
+        Assert.Equal(root.Id, configuration.NavigationFolders.Single(folder => folder.Id == moved.Id).ParentId);
+        Assert.Equal(
+            [first.Id, moved.Id, second.Id],
+            configuration.NavigationFolders
+                .Where(folder => folder.ParentId == root.Id)
+                .OrderBy(folder => folder.SortOrder)
+                .Select(folder => folder.Id));
     }
 
     [Fact]

@@ -48,6 +48,7 @@
     <Setter Property="Background" Value="{DynamicResource FogBrush}" />
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
     <Setter Property="FontFamily" Value="{DynamicResource BodyFont}" />
+    <Setter Property="FontSize" Value="{DynamicResource AppFontSize}" />
     <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
   </Style>
 
@@ -58,20 +59,20 @@
 
   <Style x:Key="WindowTitleStyle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="28" />
+    <Setter Property="FontSize" Value="{DynamicResource AppFontSizeTitle}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
   </Style>
 
   <Style x:Key="SectionTitleStyle" TargetType="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontSize" Value="{DynamicResource AppFontSizeSection}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource InkBrush}" />
   </Style>
 
   <Style x:Key="FieldLabelStyle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource AppFontSizeSmall}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource SlateBrush}" />
     <Setter Property="Margin" Value="0,0,0,6" />
@@ -79,7 +80,7 @@
 
   <Style x:Key="SecondaryTextStyle" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource SlateBrush}" />
-    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontSize" Value="{DynamicResource AppFontSizeSecondary}" />
   </Style>
 
   <Style x:Key="SurfaceCardStyle" TargetType="Border">

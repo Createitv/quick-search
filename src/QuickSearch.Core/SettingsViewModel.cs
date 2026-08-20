@@ -15,6 +15,8 @@ public sealed class SettingsViewModel : ObservableObject
     private string _launcherShortcut = string.Empty;
     private bool _startWithWindows;
     private bool _automaticallyCheckForUpdates;
+    private int _quickLauncherResultColumns;
+    private double _uiFontSize;
     private string _everythingHealthText = string.Empty;
     private EverythingHealth _everythingHealth;
     private string _message = string.Empty;
@@ -128,6 +130,18 @@ public sealed class SettingsViewModel : ObservableObject
         set => SetProperty(ref _automaticallyCheckForUpdates, value);
     }
 
+    public int QuickLauncherResultColumns
+    {
+        get => _quickLauncherResultColumns;
+        set => SetProperty(ref _quickLauncherResultColumns, Math.Clamp(value, 1, 3));
+    }
+
+    public double UiFontSize
+    {
+        get => _uiFontSize;
+        set => SetProperty(ref _uiFontSize, Math.Clamp(value, 11, 22));
+    }
+
     public string EverythingHealthText
     {
         get => _everythingHealthText;
@@ -194,6 +208,11 @@ public sealed class SettingsViewModel : ObservableObject
         StartWithWindows = _configuration.Settings.StartWithWindows;
         AutomaticallyCheckForUpdates =
             _configuration.Settings.AutomaticallyCheckForUpdates;
+        QuickLauncherResultColumns = Math.Clamp(
+            _configuration.Settings.QuickLauncherResultColumns,
+            1,
+            3);
+        UiFontSize = Math.Clamp(_configuration.Settings.UiFontSize, 11, 22);
         Organizer.BeginEdit(_configuration);
         foreach (var group in MappingGroups)
         {
@@ -381,7 +400,9 @@ public sealed class SettingsViewModel : ObservableObject
             GlobalShortcut = shortcut,
             QuickLauncherShortcut = launcherShortcut,
             StartWithWindows = StartWithWindows,
-            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates
+            AutomaticallyCheckForUpdates = AutomaticallyCheckForUpdates,
+            QuickLauncherResultColumns = QuickLauncherResultColumns,
+            UiFontSize = UiFontSize
         };
 
         if (!_mappingGroupsDirty)

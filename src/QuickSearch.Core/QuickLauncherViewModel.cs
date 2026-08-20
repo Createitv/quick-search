@@ -3,6 +3,10 @@ namespace QuickSearch.Core;
 public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
 {
     private static readonly TimeSpan SearchDebounce = TimeSpan.FromMilliseconds(120);
+    private const int MinimumResultColumns = 1;
+    private const int MaximumResultColumns = 3;
+    private const double MinimumUiFontSize = 11;
+    private const double MaximumUiFontSize = 22;
     private readonly AppConfiguration _configuration;
     private readonly IMappingStore _store;
     private readonly IQuickLauncherSearch _search;
@@ -89,6 +93,17 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     public string LauncherShortcutText =>
         $"{_configuration.Settings.QuickLauncherShortcut} 呼出启动器";
 
+    public int ResultColumns => ClampResultColumns(
+        _configuration.Settings.QuickLauncherResultColumns);
+
+    public double UiFontSize => ClampUiFontSize(_configuration.Settings.UiFontSize);
+
+    public double SearchFontSize => UiFontSize + 8;
+
+    public double ResultTitleFontSize => UiFontSize;
+
+    public double ResultDetailFontSize => Math.Max(10, UiFontSize - 2.5);
+
     public void Reset()
     {
         CancelSearch();
@@ -100,6 +115,7 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         IsSearching = false;
         StatusText = "输入快捷导航名称，或搜索应用、文件和文件夹";
         OnPropertyChanged(nameof(LauncherShortcutText));
+        RefreshSettings();
     }
 
     public void PrefillFromClipboard()
@@ -189,6 +205,56 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
     public void RequestSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
 
     public void RequestHide() => HideRequested?.Invoke(this, EventArgs.Empty);
+
+    public async Task SetResultColumnsAsync(int columns)
+    {
+        var normalized = ClampResultColumns(columns);
+        if (normalized == ResultColumns)
+        {
+            return;
+        }
+
+        var candidate = _configuration.Clone();
+        candidate.Settings = candidate.Settings with
+        {
+            QuickLauncherResultColumns = normalized
+        };
+        await _store.SaveAsync(candidate);
+        _configuration.ReplaceWith(candidate);
+        RefreshSettings();
+    }
+
+    public void ReorderResult(QuickLauncherResult source, QuickLauncherResult target)
+    {
+        var items = Results.ToList();
+        var sourceIndex = items.IndexOf(source);
+        var targetIndex = items.IndexOf(target);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+        {
+            return;
+        }
+
+        items.RemoveAt(sourceIndex);
+        targetIndex = items.IndexOf(target);
+        items.Insert(targetIndex, source);
+        Results = items
+            .Select((item, index) => item with
+            {
+                ShortcutText = index < 9 ? $"Ctrl+{index + 1}" : string.Empty
+            })
+            .ToArray();
+        SelectedResult = source;
+    }
+
+    public void RefreshSettings()
+    {
+        OnPropertyChanged(nameof(LauncherShortcutText));
+        OnPropertyChanged(nameof(ResultColumns));
+        OnPropertyChanged(nameof(UiFontSize));
+        OnPropertyChanged(nameof(SearchFontSize));
+        OnPropertyChanged(nameof(ResultTitleFontSize));
+        OnPropertyChanged(nameof(ResultDetailFontSize));
+    }
 
     public void Dispose()
     {
@@ -341,4 +407,10 @@ public sealed class QuickLauncherViewModel : ObservableObject, IDisposable
         SelectedResult = null;
         StatusText = statusText;
     }
+
+    private static int ClampResultColumns(int columns) =>
+        Math.Clamp(columns, MinimumResultColumns, MaximumResultColumns);
+
+    private static double ClampUiFontSize(double fontSize) =>
+        Math.Clamp(fontSize, MinimumUiFontSize, MaximumUiFontSize);
 }

@@ -140,6 +140,63 @@ public sealed class AppConfiguration
         return _navigationFolders[GetFolderIndex(folderId)];
     }
 
+    public NavigationFolder MoveNavigationFolderRelative(
+        Guid folderId,
+        Guid targetFolderId,
+        bool placeAfterTarget)
+    {
+        if (folderId == UncategorizedFolderId)
+        {
+            throw new InvalidOperationException("未分类文件夹不能移动。");
+        }
+
+        if (folderId == targetFolderId)
+        {
+            return _navigationFolders[GetFolderIndex(folderId)];
+        }
+
+        var sourceIndex = GetFolderIndex(folderId);
+        var source = _navigationFolders[sourceIndex];
+        var target = _navigationFolders[GetFolderIndex(targetFolderId)];
+        var parentId = target.ParentId;
+        ValidateParentExists(parentId);
+        if (parentId == folderId || IsDescendant(parentId, folderId))
+        {
+            throw new InvalidOperationException("文件夹不能移动到自身或自己的子文件夹中。");
+        }
+
+        ValidateFolderName(source.Name, parentId, folderId);
+        var updated = source with
+        {
+            ParentId = parentId,
+            UpdatedAtUtc = UtcNow()
+        };
+        var siblings = _navigationFolders
+            .Where(folder => folder.ParentId == parentId && folder.Id != folderId)
+            .OrderBy(folder => folder.SortOrder)
+            .ThenBy(folder => folder.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var relativeIndex = siblings.FindIndex(folder => folder.Id == targetFolderId);
+        if (relativeIndex < 0)
+        {
+            throw new InvalidOperationException("目标文件夹不存在。");
+        }
+
+        siblings.Insert(placeAfterTarget ? relativeIndex + 1 : relativeIndex, updated);
+        for (var order = 0; order < siblings.Count; order++)
+        {
+            var index = GetFolderIndex(siblings[order].Id);
+            _navigationFolders[index] = siblings[order] with { SortOrder = order };
+        }
+
+        if (source.ParentId != parentId)
+        {
+            NormalizeFolderOrder(source.ParentId);
+        }
+
+        return _navigationFolders[GetFolderIndex(folderId)];
+    }
+
     public bool RemoveNavigationFolder(Guid folderId)
     {
         if (folderId == UncategorizedFolderId)

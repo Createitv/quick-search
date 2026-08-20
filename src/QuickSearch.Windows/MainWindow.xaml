@@ -69,7 +69,8 @@
     <KeyBinding Key="Escape" Command="{Binding HideCommand}" />
   </Window.InputBindings>
 
-  <Grid Background="{DynamicResource PaperBrush}">
+  <Grid Background="{DynamicResource PaperBrush}"
+        FontSize="{DynamicResource AppFontSize}">
     <Grid.RowDefinitions>
       <RowDefinition Height="44" />
       <RowDefinition Height="*" />
@@ -105,11 +106,14 @@
                         DragOver="PinnedFolder_DragOver"
                         DragLeave="PinnedFolder_DragLeave"
                         Drop="PinnedFolder_Drop">
-                  <StackPanel Orientation="Horizontal">
-                    <ui:SymbolIcon Margin="0,0,7,0" Symbol="Pin16" FontSize="14"
-                                   Foreground="{DynamicResource RouteBlueBrush}" />
-                    <TextBlock Text="{Binding Name}" />
-                  </StackPanel>
+                  <TextBlock Text="{Binding Name}" />
+                  <Button.ContextMenu>
+                    <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                      <MenuItem Header="取消固定" Click="PinnedFolder_Unpin_Click">
+                        <MenuItem.Icon><ui:SymbolIcon Symbol="PinOff20" /></MenuItem.Icon>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Button.ContextMenu>
                 </Button>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -564,11 +568,11 @@
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Text="剪贴板快速打开" Style="{StaticResource FieldLabelStyle}" />
+                <TextBlock Text="主窗口快捷键" Style="{StaticResource FieldLabelStyle}" />
                 <TextBox Margin="0,7,0,0"
-                         AutomationProperties.Name="剪贴板快速打开快捷键"
+                         AutomationProperties.Name="主窗口快捷键"
                          Text="{Binding Shortcut, UpdateSourceTrigger=PropertyChanged}" />
-                <TextBlock Margin="2,6,0,0" Text="复制快捷导航名称后使用，直接打开关联的文件夹。"
+                <TextBlock Margin="2,6,0,0" Text="按下后打开 QuickSearch，不读取剪贴板内容。"
                            TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
               </StackPanel>
               <StackPanel Grid.Column="2">
@@ -597,6 +601,37 @@
               <CheckBox Margin="0,14,0,0" Content="每次启动时自动检查更新"
                         IsChecked="{Binding AutomaticallyCheckForUpdates}" />
             </StackPanel>
+          </Border>
+
+          <TextBlock Text="显示" Style="{StaticResource SectionTitleStyle}" />
+          <Border Margin="0,10,0,24" Style="{StaticResource SurfaceCardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="24" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="快速启动器分栏" Style="{StaticResource FieldLabelStyle}" />
+                <ComboBox Margin="0,7,0,0"
+                          SelectedValue="{Binding QuickLauncherResultColumns, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                          SelectedValuePath="Tag">
+                  <ComboBoxItem Content="一栏" Tag="1" />
+                  <ComboBoxItem Content="两栏" Tag="2" />
+                  <ComboBoxItem Content="三栏" Tag="3" />
+                </ComboBox>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="字体大小" Style="{StaticResource FieldLabelStyle}" />
+                <Slider Margin="0,7,0,0" Minimum="11" Maximum="22" TickFrequency="1"
+                        IsSnapToTickEnabled="True"
+                        Value="{Binding UiFontSize, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Margin="2,6,0,0">
+                  <Run Text="{Binding UiFontSize, StringFormat={}{0:0}}" />
+                  <Run Text=" pt" />
+                </TextBlock>
+              </StackPanel>
+            </Grid>
           </Border>
 
           <TextBlock Text="应用更新" Style="{StaticResource SectionTitleStyle}" />

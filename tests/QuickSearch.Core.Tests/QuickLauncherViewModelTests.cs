@@ -166,6 +166,68 @@ public sealed class QuickLauncherViewModelTests
     }
 
     [Fact]
+    public async Task SetResultColumnsAsync_PersistsClampedLayout()
+    {
+        var configuration = new AppConfiguration();
+        var store = new MemoryMappingStore(configuration);
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            store,
+            new FakeQuickLauncherSearch([]),
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask);
+
+        await viewModel.SetResultColumnsAsync(3);
+
+        Assert.Equal(3, viewModel.ResultColumns);
+        Assert.Equal(3, configuration.Settings.QuickLauncherResultColumns);
+    }
+
+    [Fact]
+    public async Task ReorderResult_UpdatesVisibleOrderAndShortcuts()
+    {
+        var configuration = new AppConfiguration();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            new FakeQuickLauncherSearch(
+            [
+                new("one", @"C:\one", QuickLauncherItemKind.Folder),
+                new("two", @"C:\two", QuickLauncherItemKind.Folder),
+                new("three", @"C:\three", QuickLauncherItemKind.Folder)
+            ]),
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask);
+        viewModel.SearchText = "item";
+        await EventuallyAsync(() => !viewModel.IsSearching && viewModel.Results.Count == 3);
+
+        viewModel.ReorderResult(viewModel.Results[2], viewModel.Results[0]);
+
+        Assert.Equal(["three", "one", "two"], viewModel.Results.Select(result => result.Title));
+        Assert.Equal("Ctrl+1", viewModel.Results[0].ShortcutText);
+        Assert.Equal("three", viewModel.SelectedResult?.Title);
+    }
+
+    [Fact]
+    public async Task ShowWithoutClipboardPrefill_RemainsEmptyUntilUserTypes()
+    {
+        var configuration = new AppConfiguration();
+        var viewModel = new QuickLauncherViewModel(
+            configuration,
+            new MemoryMappingStore(configuration),
+            new FakeQuickLauncherSearch([]),
+            new FakePathOpener(),
+            (_, _) => Task.CompletedTask,
+            new FakeClipboardTextReader("剪贴板文字"));
+
+        viewModel.Reset();
+        await Task.Delay(1);
+
+        Assert.Equal(string.Empty, viewModel.SearchText);
+        Assert.Empty(viewModel.Results);
+    }
+
+    [Fact]
     public async Task NewSearch_CancelsPreviousSearchAndKeepsLatestResults()
     {
         var configuration = new AppConfiguration();

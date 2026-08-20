@@ -341,8 +341,7 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private async void Hotkey_Pressed(object? sender, EventArgs e) =>
-        await ActivateFromClipboardAsync();
+    private void Hotkey_Pressed(object? sender, EventArgs e) => ShowLauncher();
 
     private void LauncherHotkey_Pressed(object? sender, EventArgs e) => ShowQuickLauncher();
 
@@ -350,8 +349,12 @@ public partial class MainWindow : Window, IDisposable
 
     private void ViewModel_ShowSettingsRequested(object? sender, EventArgs e) => ShowSettings();
 
-    private void SettingsViewModel_Saved(object? sender, EventArgs e) =>
+    private void SettingsViewModel_Saved(object? sender, EventArgs e)
+    {
         _viewModel.RefreshConfiguration();
+        FontSizeResources.Apply(_viewModel.Configuration.Settings.UiFontSize);
+        _quickLauncherViewModel.RefreshSettings();
+    }
 
     private void SettingsViewModel_HideRequested(object? sender, EventArgs e) =>
         ShowExplorerPage();
@@ -542,6 +545,14 @@ public partial class MainWindow : Window, IDisposable
             new PinMoveRequest(source.Id, target.Id, placeAfterTarget));
         _draggedPin = null;
         e.Handled = true;
+    }
+
+    private void PinnedFolder_Unpin_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is NavigationFolder folder)
+        {
+            _viewModel.Explorer.UnpinFolderCommand.Execute(folder);
+        }
     }
 
     private static void ResetPinnedFolderDropIndicator(Button? button)
@@ -745,8 +756,9 @@ public partial class MainWindow : Window, IDisposable
 
         var canDropRule = e.Data.GetData(typeof(FolderRule)) is FolderRule rule
                           && rule.NavigationFolderId != target.Id;
+        var placement = GetFolderDropPlacement(targetButton, e);
         var canDropFolder = e.Data.GetData(typeof(NavigationFolder)) is NavigationFolder folder
-                            && CanNestFolder(folder.Id, target.Id);
+                            && CanDropFolder(folder.Id, target.Folder, placement);
         if (!canDropRule && !canDropFolder)
         {
             e.Effects = DragDropEffects.None;
@@ -755,7 +767,9 @@ public partial class MainWindow : Window, IDisposable
 
         targetButton.Background = FindResource("SoftBlueBrush") as System.Windows.Media.Brush;
         targetButton.BorderBrush = FindResource("RouteBlueBrush") as System.Windows.Media.Brush;
-        targetButton.BorderThickness = new Thickness(2);
+        targetButton.BorderThickness = canDropFolder
+            ? GetFolderDropBorder(placement)
+            : new Thickness(2);
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
     }
@@ -776,10 +790,18 @@ public partial class MainWindow : Window, IDisposable
             _viewModel.Explorer.MoveRuleCommand.Execute(new RuleMoveRequest(rule.Id, target.Id));
             _draggedRule = null;
         }
-        else if (e.Data.GetData(typeof(NavigationFolder)) is NavigationFolder folder
-                 && CanNestFolder(folder.Id, target.Id))
+        else if (e.Data.GetData(typeof(NavigationFolder)) is NavigationFolder folder)
         {
-            _ = _viewModel.Explorer.MoveFolderAsync(folder.Id, target.Id);
+            var placement = sender is Button button
+                ? GetFolderDropPlacement(button, e)
+                : FolderDropPlacement.Inside;
+            if (!CanDropFolder(folder.Id, target.Folder, placement))
+            {
+                return;
+            }
+
+            _viewModel.Explorer.MoveFolderCommand.Execute(
+                new FolderMoveRequest(folder.Id, target.Id, placement));
             _draggedFolder = null;
         }
         else
@@ -826,7 +848,22 @@ public partial class MainWindow : Window, IDisposable
         }
     }
 
-    private bool CanNestFolder(Guid folderId, Guid targetParentId)
+    private bool CanDropFolder(
+        Guid folderId,
+        NavigationFolder target,
+        FolderDropPlacement placement)
+    {
+        if (folderId == target.Id)
+        {
+            return false;
+        }
+
+        return placement == FolderDropPlacement.Inside
+            ? CanMoveFolderToParent(folderId, target.Id)
+            : CanMoveFolderToParent(folderId, target.ParentId);
+    }
+
+    private bool CanMoveFolderToParent(Guid folderId, Guid? targetParentId)
     {
         if (folderId == _viewModel.Configuration.UncategorizedFolderId
             || folderId == targetParentId)
@@ -834,7 +871,7 @@ public partial class MainWindow : Window, IDisposable
             return false;
         }
 
-        var currentId = (Guid?)targetParentId;
+        var currentId = targetParentId;
         var visited = new HashSet<Guid>();
         while (currentId is Guid id && visited.Add(id))
         {
@@ -850,6 +887,30 @@ public partial class MainWindow : Window, IDisposable
 
         return true;
     }
+
+    private static FolderDropPlacement GetFolderDropPlacement(Button targetButton, DragEventArgs e)
+    {
+        var y = e.GetPosition(targetButton).Y;
+        if (y <= targetButton.ActualHeight * 0.28)
+        {
+            return FolderDropPlacement.Before;
+        }
+
+        if (y >= targetButton.ActualHeight * 0.72)
+        {
+            return FolderDropPlacement.After;
+        }
+
+        return FolderDropPlacement.Inside;
+    }
+
+    private static Thickness GetFolderDropBorder(FolderDropPlacement placement) =>
+        placement switch
+        {
+            FolderDropPlacement.Before => new Thickness(2, 4, 2, 1),
+            FolderDropPlacement.After => new Thickness(2, 1, 2, 4),
+            _ => new Thickness(2)
+        };
 
     private static void ResetFolderDropIndicator(Button? button)
     {

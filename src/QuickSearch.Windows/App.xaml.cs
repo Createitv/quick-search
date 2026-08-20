@@ -61,6 +61,7 @@ public partial class App : System.Windows.Application
         }
 
         base.OnStartup(e);
+        FontSizeResources.Apply(FontSizeResources.DefaultFontSize);
         var configDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "QuickSearch");
@@ -109,6 +110,7 @@ public partial class App : System.Windows.Application
         MainWindow = _mainWindow;
         new WindowInteropHelper(_mainWindow).EnsureHandle();
         await _mainWindow.InitializeAsync();
+        FontSizeResources.Apply(launcherViewModel.Configuration.Settings.UiFontSize);
         if (updatedRequested)
         {
             _mainWindow.ReportStatus("QuickSearch 已更新完成。");
@@ -118,8 +120,8 @@ public partial class App : System.Windows.Application
 
         var activationController = new SingleInstanceActivationController(_singleInstance);
         var primaryResult = activationController.Start(
-            () => Dispatcher.BeginInvoke(async () =>
-                await _mainWindow.ActivateFromClipboardAsync()));
+            () => Dispatcher.BeginInvoke((Action)(() =>
+                _mainWindow.ShowLauncher())));
         if (!primaryResult.Operation.Success)
         {
             _mainWindow.ReportStatus(primaryResult.Operation.Message);
@@ -141,7 +143,7 @@ public partial class App : System.Windows.Application
         }
         else if (!backgroundRequested)
         {
-            await _mainWindow.ActivateFromClipboardAsync();
+            _mainWindow.ShowLauncher();
         }
     }
 

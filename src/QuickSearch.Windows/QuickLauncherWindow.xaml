@@ -3,20 +3,27 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:core="clr-namespace:QuickSearch.Core;assembly=QuickSearch.Core"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
-        Title="快速启动器" Width="640" Height="510"
-        MinWidth="520" MaxWidth="760"
-        WindowStyle="None" ResizeMode="NoResize"
-        AllowsTransparency="True" Background="Transparent"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="快速启动器" Width="720" Height="560"
+        MinWidth="520" MinHeight="390" MaxWidth="1200"
+        WindowStyle="None" ResizeMode="CanResizeWithGrip"
+        Background="Transparent"
         ShowInTaskbar="False" Topmost="True"
+        SizeChanged="Window_SizeChanged"
         PreviewKeyDown="Window_PreviewKeyDown"
         Deactivated="Window_Deactivated"
         Closing="Window_Closing">
+  <shell:WindowChrome.WindowChrome>
+    <shell:WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+                        CornerRadius="0" GlassFrameThickness="0" />
+  </shell:WindowChrome.WindowChrome>
   <Window.Resources>
     <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     <Style x:Key="LauncherResultItemStyle" TargetType="ListBoxItem">
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Width" Value="{Binding ResultItemWidth, RelativeSource={RelativeSource AncestorType=Window}}" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Margin" Value="0" />
+      <Setter Property="Margin" Value="0,0,0,8" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -47,7 +54,7 @@
     <Border.Effect>
       <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.24" Color="#334155" />
     </Border.Effect>
-    <Grid>
+    <Grid FontSize="{DynamicResource AppFontSize}">
       <Grid.RowDefinitions>
         <RowDefinition Height="76" />
         <RowDefinition Height="*" />
@@ -55,7 +62,8 @@
       </Grid.RowDefinitions>
 
       <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1"
-              CornerRadius="14,14,0,0" Background="{DynamicResource PaperBrush}">
+              CornerRadius="14,14,0,0" Background="{DynamicResource PaperBrush}"
+              MouseLeftButtonDown="Header_MouseLeftButtonDown">
         <Grid Margin="20,12,14,12">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -65,7 +73,8 @@
           <ui:SymbolIcon Symbol="Search24" FontSize="25" Margin="2,0,13,0"
                          Foreground="{DynamicResource RouteBlueBrush}" />
           <TextBox x:Name="LauncherSearchBox" Grid.Column="1"
-                   FontFamily="{DynamicResource DisplayFont}" FontSize="22" FontWeight="Medium"
+                   FontFamily="{DynamicResource DisplayFont}"
+                   FontSize="{Binding SearchFontSize}" FontWeight="Medium"
                    Padding="0" MinHeight="42" BorderThickness="0" Background="Transparent"
                    AutomationProperties.Name="搜索快捷导航、应用、文件和文件夹"
                    Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
@@ -94,11 +103,22 @@
         <ListBox x:Name="ResultsList" ItemsSource="{Binding Results}"
                  SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
                  ItemContainerStyle="{StaticResource LauncherResultItemStyle}"
+                 SizeChanged="ResultsList_SizeChanged"
                  MouseDoubleClick="ResultsList_MouseDoubleClick"
                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
             <DataTemplate>
-              <Grid>
+              <Grid PreviewMouseLeftButtonDown="Result_PreviewMouseLeftButtonDown"
+                    PreviewMouseMove="Result_PreviewMouseMove"
+                    AllowDrop="True"
+                    DragOver="Result_DragOver"
+                    DragLeave="Result_DragLeave"
+                    Drop="Result_Drop">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="42" />
                   <ColumnDefinition Width="*" />
@@ -126,9 +146,12 @@
                   </ui:SymbolIcon>
                 </Border>
                 <StackPanel Grid.Column="1" Margin="0,0,16,0">
-                  <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"
+                  <TextBlock Text="{Binding Title}"
+                             FontSize="{Binding DataContext.ResultTitleFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
+                             FontWeight="SemiBold"
                              TextTrimming="CharacterEllipsis" />
-                  <TextBlock Margin="0,3,0,0" FontSize="11.5"
+                  <TextBlock Margin="0,3,0,0"
+                             FontSize="{Binding DataContext.ResultDetailFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                              Foreground="{DynamicResource SlateBrush}" TextTrimming="CharacterEllipsis">
                     <Run Text="{Binding Detail, Mode=OneWay}" />
                     <Run Text="  ·  " />
@@ -169,6 +192,18 @@
                            Foreground="{DynamicResource SlateBrush}" />
               </StackPanel>
             </Border>
+            <Button Width="34" Height="32" Padding="0" Margin="0,0,4,0"
+                    ToolTip="结果布局" Style="{StaticResource QuietButtonStyle}"
+                    Click="Layout_Click">
+              <ui:SymbolIcon Symbol="Apps20" FontSize="17" />
+              <Button.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="一栏" Tag="1" Click="LayoutMenuItem_Click" />
+                  <MenuItem Header="两栏" Tag="2" Click="LayoutMenuItem_Click" />
+                  <MenuItem Header="三栏" Tag="3" Click="LayoutMenuItem_Click" />
+                </ContextMenu>
+              </Button.ContextMenu>
+            </Button>
             <Button Width="34" Height="32" Padding="0"
                     ToolTip="启动器设置" Style="{StaticResource QuietButtonStyle}"
                     Click="Settings_Click">

@@ -43,6 +43,11 @@ public sealed class RuleExplorerViewModel : ObservableObject
                 request.FolderId,
                 request.TargetFolderId,
                 request.PlaceAfterTarget));
+        MoveFolderCommand = new AsyncRelayCommand<FolderMoveRequest>(request =>
+            MoveFolderAsync(
+                request.FolderId,
+                request.TargetFolderId,
+                request.Placement));
         MoveRuleCommand = new AsyncRelayCommand<RuleMoveRequest>(request =>
             MoveRuleAsync(request.RuleId, request.TargetFolderId));
         CreateFolderCommand = new AsyncRelayCommand<FolderNameRequest>(request =>
@@ -143,6 +148,8 @@ public sealed class RuleExplorerViewModel : ObservableObject
     public AsyncRelayCommand<NavigationFolder> UnpinFolderCommand { get; }
 
     public AsyncRelayCommand<PinMoveRequest> ReorderPinnedFolderCommand { get; }
+
+    public AsyncRelayCommand<FolderMoveRequest> MoveFolderCommand { get; }
 
     public AsyncRelayCommand<RuleMoveRequest> MoveRuleCommand { get; }
 
@@ -247,6 +254,40 @@ public sealed class RuleExplorerViewModel : ObservableObject
                 targetParentId,
                 int.MaxValue),
             $"已将“{folder.Name}”移动到“{target.Name}”中。",
+            "无法移动文件夹");
+    }
+
+    public async Task<bool> MoveFolderAsync(
+        Guid folderId,
+        Guid targetFolderId,
+        FolderDropPlacement placement)
+    {
+        if (_configuration.NavigationFolders.FirstOrDefault(folder =>
+                folder.Id == folderId) is not { } folder
+            || _configuration.NavigationFolders.FirstOrDefault(candidate =>
+                candidate.Id == targetFolderId) is not { } target)
+        {
+            Report("文件夹或目标位置不存在。", StatusKind.Error);
+            return false;
+        }
+
+        if (placement == FolderDropPlacement.Inside)
+        {
+            return await MoveFolderAsync(folderId, targetFolderId);
+        }
+
+        if (folder.Id == target.Id)
+        {
+            Report("文件夹位置没有变化。", StatusKind.Neutral);
+            return false;
+        }
+
+        return await ApplyImmediateAsync(
+            candidate => candidate.MoveNavigationFolderRelative(
+                folderId,
+                targetFolderId,
+                placement == FolderDropPlacement.After),
+            $"已将“{folder.Name}”移动到“{target.Name}”{GetPlacementLabel(placement)}。",
             "无法移动文件夹");
     }
 
@@ -617,6 +658,11 @@ public sealed class RuleExplorerViewModel : ObservableObject
             candidate.RemoveNavigationFolder(id);
         }
     }
+
+    private static string GetPlacementLabel(FolderDropPlacement placement) =>
+        placement == FolderDropPlacement.After
+            ? "后面"
+            : "前面";
 
     private static IEnumerable<Guid> GetSubtree(
         AppConfiguration configuration,

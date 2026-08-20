@@ -15,4 +15,8 @@ public sealed record AppSettings
     public bool HasCompletedOnboarding { get; init; }
 
     public DateTimeOffset? LastUpdateCheckAtUtc { get; init; }
+
+    public int QuickLauncherResultColumns { get; init; } = 1;
+
+    public double UiFontSize { get; init; } = 14;
 }

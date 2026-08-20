@@ -279,6 +279,34 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task MoveFolderAsync_WithBeforePlacement_ReordersAcrossParents()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var customer = configuration.NavigationFolders.Single(folder => folder.Name == "客户");
+        var personal = configuration.NavigationFolders.Single(folder => folder.Name == "个人");
+        var xiaoxi = configuration.NavigationFolders.Single(folder => folder.Name == "小溪");
+
+        await viewModel.MoveFolderAsync(
+            personal.Id,
+            xiaoxi.Id,
+            FolderDropPlacement.Before);
+
+        Assert.Equal(customer.Id, configuration.NavigationFolders.Single(folder => folder.Id == personal.Id).ParentId);
+        Assert.Equal(
+            [personal.Id, xiaoxi.Id],
+            configuration.NavigationFolders
+                .Where(folder => folder.ParentId == customer.Id)
+                .OrderBy(folder => folder.SortOrder)
+                .Select(folder => folder.Id));
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
     public async Task CreateRuleAsync_PersistsAndShowsRuleInCurrentFolder()
     {
         var configuration = CreateConfiguration();

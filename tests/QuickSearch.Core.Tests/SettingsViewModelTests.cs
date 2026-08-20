@@ -142,6 +142,22 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveAsync_PersistsDisplayPreferences()
+    {
+        var configuration = CreateConfiguration();
+        var store = new FakeMappingStore();
+        var viewModel = CreateViewModel(configuration, store);
+        viewModel.QuickLauncherResultColumns = 3;
+        viewModel.UiFontSize = 18;
+
+        await viewModel.SaveAsync();
+
+        Assert.Equal(3, configuration.Settings.QuickLauncherResultColumns);
+        Assert.Equal(18, configuration.Settings.UiFontSize);
+        Assert.Equal(1, store.SaveCalls);
+    }
+
+    [Fact]
     public async Task SaveAsync_RejectsMatchingFolderAndLauncherShortcuts()
     {
         var configuration = CreateConfiguration();

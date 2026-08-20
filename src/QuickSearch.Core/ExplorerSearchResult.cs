@@ -35,3 +35,15 @@ public sealed record PinMoveRequest(
 public sealed record RuleMoveRequest(Guid RuleId, Guid TargetFolderId);
 
 public sealed record FolderNameRequest(Guid? ParentId, Guid? FolderId, string Name);
+
+public enum FolderDropPlacement
+{
+    Before,
+    Inside,
+    After
+}
+
+public sealed record FolderMoveRequest(
+    Guid FolderId,
+    Guid TargetFolderId,
+    FolderDropPlacement Placement);

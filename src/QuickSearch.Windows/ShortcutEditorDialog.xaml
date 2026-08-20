@@ -22,7 +22,8 @@
                        Foreground="{DynamicResource RouteBlueBrush}" />
       </Border>
       <StackPanel VerticalAlignment="Center">
-        <TextBlock x:Name="HeadingText" Text="新建快捷导航" Style="{StaticResource WindowTitleStyle}" FontSize="22" />
+        <TextBlock x:Name="HeadingText" Text="新建快捷导航" Style="{StaticResource WindowTitleStyle}"
+                   FontSize="{DynamicResource AppFontSizeDialogTitle}" />
         <TextBlock x:Name="DescriptionText" Margin="0,3,0,0" Text="为常用文件夹命名，之后输入名称即可打开"
                    Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
@@ -44,7 +45,7 @@
       <TextBox x:Name="TitleBox" MaxLength="120" TextChanged="Field_TextChanged"
                ToolTip="启动器会优先搜索这个名称" />
       <TextBlock Margin="2,5,0,0" Text="请输入容易记住的名称，启动器会优先搜索它。"
-                 Style="{StaticResource SecondaryTextStyle}" FontSize="12" />
+                 Style="{StaticResource SecondaryTextStyle}" />
     </StackPanel>
 
     <StackPanel Grid.Row="3" Margin="0,18,0,0">
