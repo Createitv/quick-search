@@ -30,6 +30,15 @@ public sealed class ShortcutGestureTests
         Assert.Throws<FormatException>(() => ShortcutGesture.Parse(text));
     }
 
+    [Theory]
+    [InlineData("Ctrl+C")]
+    [InlineData("Ctrl+X")]
+    [InlineData("Ctrl+V")]
+    public void Parse_RejectsSystemClipboardShortcuts(string text)
+    {
+        Assert.Throws<FormatException>(() => ShortcutGesture.Parse(text));
+    }
+
     [Fact]
     public void ToWpfKeyName_TranslatesDigitToWpfDKey()
     {

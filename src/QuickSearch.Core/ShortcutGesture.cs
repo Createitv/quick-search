@@ -54,6 +54,15 @@ public sealed record ShortcutGesture(
             throw new FormatException($"Shortcut requires a modifier and key: {text}");
         }
 
+        if (control
+            && !alt
+            && !shift
+            && !windows
+            && key is "C" or "X" or "V")
+        {
+            throw new FormatException($"系统复制、剪切或粘贴快捷键不可占用：{text}");
+        }
+
         return new ShortcutGesture(control, alt, shift, windows, key);
     }
 

@@ -6,7 +6,6 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
 
     private readonly IMappingStore _store;
     private readonly IFolderSearch _search;
-    private readonly IClipboardTextReader _clipboard;
     private readonly IFolderOpener _opener;
     private readonly Func<string, bool> _folderExists;
     private readonly Func<TimeSpan, CancellationToken, Task> _delayAsync;
@@ -26,18 +25,15 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     public LauncherViewModel(
         IMappingStore store,
         IFolderSearch search,
-        IClipboardTextReader clipboard,
         IFolderOpener opener,
         Func<string, bool>? folderExists = null,
         Func<TimeSpan, CancellationToken, Task>? delayAsync = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(search);
-        ArgumentNullException.ThrowIfNull(clipboard);
         ArgumentNullException.ThrowIfNull(opener);
         _store = store;
         _search = search;
-        _clipboard = clipboard;
         _opener = opener;
         _folderExists = folderExists ?? Directory.Exists;
         _delayAsync = delayAsync ?? Task.Delay;
@@ -147,7 +143,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
     }
 
     public string ShortcutInstruction =>
-        $"复制快捷导航名称后按 {Configuration.Settings.GlobalShortcut}";
+        $"按 {Configuration.Settings.GlobalShortcut} 打开 QuickSearch";
 
     public string ResolvedPath =>
         _exactMapping?.FolderPath ?? SelectedResult?.FullPath ?? string.Empty;
@@ -199,142 +195,6 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         {
             SetStatus($"无法加载配置：{exception.Message}", StatusKind.Error);
         }
-    }
-
-    public void ActivateFromClipboard()
-    {
-        InvalidatePendingSearch();
-        try
-        {
-            var result = _clipboard.ReadText();
-            if (!result.Success)
-            {
-                SetStatus(result.Message, StatusKind.Error);
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(result.Value))
-            {
-                SetStatus("剪贴板中没有可用的关键词，请手动输入。", StatusKind.Neutral);
-                return;
-            }
-
-            if (string.Equals(Alias, result.Value, StringComparison.Ordinal))
-            {
-                RefreshAliasState();
-            }
-            else
-            {
-                Alias = result.Value;
-            }
-        }
-        catch (Exception exception)
-        {
-            SetStatus($"无法读取剪贴板：{exception.Message}", StatusKind.Error);
-        }
-    }
-
-    public async Task<LauncherActivationDisposition> ActivateFromClipboardAsync()
-    {
-        ThrowIfDisposed();
-        InvalidatePendingSearch();
-        PlatformOperationResult<string?> clipboardResult;
-        try
-        {
-            clipboardResult = _clipboard.ReadText();
-        }
-        catch (Exception exception)
-        {
-            ClearSearchText();
-            SetStatus($"无法读取剪贴板：{exception.Message}", StatusKind.Error);
-            return LauncherActivationDisposition.ShowLauncher;
-        }
-
-        if (!clipboardResult.Success)
-        {
-            ClearSearchText();
-            SetStatus(clipboardResult.Message, StatusKind.Error);
-            return LauncherActivationDisposition.ShowLauncher;
-        }
-
-        var keyword = clipboardResult.Value?.Trim() ?? string.Empty;
-        if (keyword.Length == 0)
-        {
-            ClearSearchText();
-            SetStatus("输入快捷导航名称，通过 Everything 搜索文件夹。", StatusKind.Neutral);
-            return LauncherActivationDisposition.ShowLauncher;
-        }
-
-        var mappings = Configuration.FindMappings(keyword);
-        if (mappings.Count == 0)
-        {
-            ShowLocalSearch(keyword);
-            return LauncherActivationDisposition.ShowLauncher;
-        }
-
-        var openedPaths = new List<string>();
-        var failures = new List<string>();
-        foreach (var mapping in mappings)
-        {
-            if (!_folderExists(mapping.FolderPath))
-            {
-                failures.Add($"失效：{mapping.FolderPath}");
-                continue;
-            }
-
-            PlatformOperationResult openResult;
-            try
-            {
-                openResult = _opener.Open(mapping.FolderPath);
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"{mapping.FolderPath}：{exception.Message}");
-                continue;
-            }
-
-            if (openResult.Success)
-            {
-                openedPaths.Add(mapping.FolderPath);
-            }
-            else
-            {
-                failures.Add($"{mapping.FolderPath}：{openResult.Message}");
-            }
-        }
-
-        if (openedPaths.Count > 0)
-        {
-            var candidate = Configuration.Clone();
-            foreach (var openedPath in openedPaths)
-            {
-                candidate.MarkMappingUsed(keyword, openedPath);
-            }
-
-            try
-            {
-                await _store.SaveAsync(candidate);
-                Configuration.ReplaceWith(candidate);
-                Explorer.RefreshFromConfiguration();
-            }
-            catch (Exception exception)
-            {
-                failures.Add($"使用时间保存失败：{exception.Message}");
-            }
-        }
-
-        if (failures.Count == 0)
-        {
-            SetStatus($"已打开 {openedPaths.Count} 个映射文件夹。", StatusKind.Success);
-            HideRequested?.Invoke(this, EventArgs.Empty);
-            return LauncherActivationDisposition.OpenedMappings;
-        }
-
-        ShowLocalSearch(keyword);
-        SetStatus(
-            $"已打开 {openedPaths.Count} 个文件夹；{string.Join("；", failures)}",
-            StatusKind.Error);
-        return LauncherActivationDisposition.ShowLauncher;
     }
 
     public Task SearchNowAsync()
@@ -590,7 +450,7 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         var alias = Alias.Trim();
         if (alias.Length == 0)
         {
-            SetStatus("请先复制或输入快捷导航名称。", StatusKind.Neutral);
+            SetStatus("请输入快捷导航名称。", StatusKind.Neutral);
             NotifyConfirmStateChanged();
             return;
         }
@@ -632,29 +492,6 @@ public sealed class LauncherViewModel : ObservableObject, IDisposable
         }
 
         _ = DebounceAndSearchAsync(query, generation, cancellation.Token);
-    }
-
-    private void ClearSearchText()
-    {
-        SetFolderQuery(string.Empty, queueSearch: false);
-        Explorer.SearchText = string.Empty;
-        SetEverythingSearchVisible(false);
-        Results = [];
-        SelectedResult = null;
-    }
-
-    private void ShowLocalSearch(string keyword)
-    {
-        SetFolderQuery(string.Empty, queueSearch: false);
-        Results = [];
-        SelectedResult = null;
-        SetEverythingSearchVisible(false);
-        Explorer.SearchText = keyword;
-        SetStatus(
-            Explorer.HasLocalSearchResults
-                ? $"已在本地索引中找到 {Explorer.SearchResults.Count} 个结果。"
-                : "未找到本地规则，可使用 Everything 搜索文件夹。",
-            StatusKind.Neutral);
     }
 
     private void SetFolderQuery(string? value, bool queueSearch)

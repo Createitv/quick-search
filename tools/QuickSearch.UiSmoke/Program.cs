@@ -1,3 +1,4 @@
+using System.Windows.Input;
 using System.Windows.Threading;
 using System.Windows.Shell;
 using QuickSearch.Core;
@@ -19,19 +20,16 @@ internal static class Program
             var launcher = new LauncherViewModel(
                 store,
                 search,
-                new EmptyClipboardReader(),
                 new SuccessfulFolderOpener(),
                 _ => true);
             var bootstrap = new EverythingBootstrapViewModel(
                 new ReadyEverythingInstallationManager());
-            var clipboard = new MutableClipboardTextReader("项目文件");
             var mainWindow = new MainWindow(
                 launcher,
                 store,
                 search,
                 new SuccessfulStartupRegistration(),
-                bootstrap,
-                launcherClipboard: clipboard);
+                bootstrap);
             application.MainWindow = mainWindow;
             mainWindow.InitializeAsync().GetAwaiter().GetResult();
             mainWindow.Show();
@@ -45,6 +43,8 @@ internal static class Program
 
             SynchronizationContext.SetSynchronizationContext(
                 new DispatcherSynchronizationContext(application.Dispatcher));
+            const string initialClipboardText = "QuickSearch 不应自动读取这段文字";
+            System.Windows.Clipboard.SetText(initialClipboardText);
             mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);
             application.Dispatcher.Invoke(
                 () => { },
@@ -69,33 +69,47 @@ internal static class Program
                     () => launcherSearchBox.Text.Length == 0
                         && launcherResults.Items.Count == 0))
             {
-                Console.Error.WriteLine("Quick launcher should open empty without reading clipboard text.");
+                Console.Error.WriteLine("Quick launcher should open empty for manual input.");
                 return 2;
             }
 
-            if (clipboard.ReadCount != 0)
-            {
-                Console.Error.WriteLine("Quick launcher read clipboard text during normal open.");
-                return 2;
-            }
-
-            clipboard.Text = "没有任何结果";
-            launcherWindow.Hide();
-            mainWindow.ShowQuickLauncher(hideWhenDeactivated: false);
+            ApplicationCommands.Paste.Execute(null, launcherSearchBox);
             if (!WaitUntil(
                     application.Dispatcher,
-                    () => launcherSearchBox.Text.Length == 0
-                        && launcherResults.Items.Count == 0))
+                    () => launcherSearchBox.Text == initialClipboardText))
             {
-                var launcherState = launcherWindow.DataContext as QuickLauncherViewModel;
-                Console.Error.WriteLine(
-                    "Quick launcher did not stay empty when clipboard text changed. "
-                    + $"TextBox='{launcherSearchBox.Text}', Items={launcherResults.Items.Count}, "
-                    + $"ViewModelText='{launcherState?.SearchText}', "
-                    + $"ViewModelItems={launcherState?.Results.Count}, "
-                    + $"IsSearching={launcherState?.IsSearching}, Status='{launcherState?.StatusText}'.");
+                Console.Error.WriteLine("System paste did not insert clipboard text into the launcher search box.");
                 return 2;
             }
+
+            const string copiedText = "QuickSearch 系统复制剪切粘贴测试";
+            launcherSearchBox.Text = copiedText;
+            launcherSearchBox.SelectAll();
+            ApplicationCommands.Copy.Execute(null, launcherSearchBox);
+            if (System.Windows.Clipboard.GetText() != copiedText)
+            {
+                Console.Error.WriteLine("System copy did not update the Windows clipboard.");
+                return 2;
+            }
+
+            ApplicationCommands.Cut.Execute(null, launcherSearchBox);
+            if (launcherSearchBox.Text.Length != 0
+                || System.Windows.Clipboard.GetText() != copiedText)
+            {
+                Console.Error.WriteLine("System cut did not preserve the expected clipboard text.");
+                return 2;
+            }
+
+            ApplicationCommands.Paste.Execute(null, launcherSearchBox);
+            if (!WaitUntil(
+                    application.Dispatcher,
+                    () => launcherSearchBox.Text == copiedText))
+            {
+                Console.Error.WriteLine("System paste did not restore the copied text.");
+                return 2;
+            }
+
+            launcherSearchBox.Clear();
 
             launcherWindow.UpdateLayout();
             launcherWindow.Hide();
@@ -247,28 +261,6 @@ sealed class ReadyFolderSearch : IFolderSearch
         string query,
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<FolderSearchResult>>([]);
-}
-
-sealed class EmptyClipboardReader : IClipboardTextReader
-{
-    public PlatformOperationResult<string?> ReadText() =>
-        PlatformOperationResult<string?>.Succeeded(string.Empty);
-}
-
-sealed class MutableClipboardTextReader(string? text) : IClipboardTextReader
-{
-    public string? Text { get; set; } = text;
-
-    public int ReadCount { get; private set; }
-
-    public PlatformOperationResult<string?> ReadText() =>
-        PlatformOperationResult<string?>.Succeeded(Read());
-
-    private string? Read()
-    {
-        ReadCount++;
-        return Text;
-    }
 }
 
 sealed class SuccessfulFolderOpener : IFolderOpener

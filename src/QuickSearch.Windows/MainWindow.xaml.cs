@@ -54,8 +54,7 @@ public partial class MainWindow : Window, IDisposable
         IStartupRegistration startup,
         EverythingBootstrapViewModel bootstrap,
         IQuickLauncherSearch? launcherSearch = null,
-        IPathOpener? pathOpener = null,
-        IClipboardTextReader? launcherClipboard = null)
+        IPathOpener? pathOpener = null)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         ArgumentNullException.ThrowIfNull(store);
@@ -71,8 +70,7 @@ public partial class MainWindow : Window, IDisposable
             _viewModel.Configuration,
             _store,
             launcherSearch ?? new EmptyQuickLauncherSearch(),
-            pathOpener ?? new UnavailablePathOpener(),
-            clipboard: launcherClipboard);
+            pathOpener ?? new UnavailablePathOpener());
         InitializeComponent();
         DataContext = _viewModel;
         _viewModel.HideRequested += ViewModel_HideRequested;
@@ -94,25 +92,6 @@ public partial class MainWindow : Window, IDisposable
         await _viewModel.InitializeAsync();
         ApplyInitialPlatformSettings();
         UpdateRuleLayoutWidth();
-    }
-
-    public async Task ActivateFromClipboardAsync()
-    {
-        if (!_bootstrap.CanSearch)
-        {
-            ShowLauncher();
-            return;
-        }
-
-        var disposition = await _viewModel.ActivateFromClipboardAsync();
-        if (disposition == LauncherActivationDisposition.ShowLauncher)
-        {
-            ShowLauncher();
-        }
-        else
-        {
-            Hide();
-        }
     }
 
     public void ShowLauncher()

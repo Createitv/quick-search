@@ -3,100 +3,6 @@ namespace QuickSearch.Core.Tests;
 public sealed class LauncherViewModelTests
 {
     [Fact]
-    public async Task ActivateFromClipboardAsync_OpensEveryValidMappingWithoutShowingLauncher()
-    {
-        var configuration = new AppConfiguration();
-        configuration.AddMapping("sales", "/sales/current");
-        configuration.AddMapping("sales", "/sales/archive");
-        var store = new FakeMappingStore(configuration);
-        var opener = new FakeFolderOpener();
-        var viewModel = CreateViewModel(
-            store,
-            clipboard: new FakeClipboardTextReader(" SALES "),
-            opener: opener,
-            folderExists: _ => true);
-        await viewModel.InitializeAsync();
-
-        var disposition = await viewModel.ActivateFromClipboardAsync();
-
-        Assert.Equal(LauncherActivationDisposition.OpenedMappings, disposition);
-        Assert.Equal(["/sales/current", "/sales/archive"], opener.OpenedPaths);
-        Assert.Equal(1, store.SaveCalls);
-        Assert.All(
-            viewModel.Configuration.FindMappings("sales"),
-            mapping => Assert.NotNull(mapping.LastUsedAtUtc));
-    }
-
-    [Fact]
-    public async Task ActivateFromClipboardAsync_UnmappedKeywordSearchesLocalIndexAndShowsLauncher()
-    {
-        var search = new FakeFolderSearch
-        {
-            Results = [new FolderSearchResult("Sales", "/found/sales")]
-        };
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(new AppConfiguration()),
-            search: search,
-            clipboard: new FakeClipboardTextReader("sales"));
-        await viewModel.InitializeAsync();
-
-        var disposition = await viewModel.ActivateFromClipboardAsync();
-
-        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
-        Assert.Equal("sales", viewModel.Explorer.SearchText);
-        Assert.True(viewModel.CanSearchEverything);
-        Assert.Empty(viewModel.Results);
-        Assert.Null(viewModel.SelectedResult);
-        Assert.Equal(0, search.SearchCalls);
-    }
-
-    [Fact]
-    public async Task ActivateFromClipboardAsync_EmptyClipboardClearsStaleSearchAndShowsLauncher()
-    {
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(new AppConfiguration()),
-            clipboard: new FakeClipboardTextReader("  "));
-        await viewModel.InitializeAsync();
-        viewModel.FolderQuery = "stale";
-        viewModel.SelectedResult = new FolderSearchResult("Stale", "/stale");
-
-        var disposition = await viewModel.ActivateFromClipboardAsync();
-
-        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
-        Assert.Equal(string.Empty, viewModel.SearchText);
-        Assert.Equal(string.Empty, viewModel.Explorer.SearchText);
-        Assert.Empty(viewModel.Results);
-        Assert.Null(viewModel.SelectedResult);
-    }
-
-    [Fact]
-    public async Task ActivateFromClipboardAsync_PartialMappingFailureOpensValidPathsAndShowsSearch()
-    {
-        var configuration = new AppConfiguration();
-        configuration.AddMapping("sales", "/sales/current");
-        configuration.AddMapping("sales", "/sales/missing");
-        var search = new FakeFolderSearch();
-        var opener = new FakeFolderOpener();
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(configuration),
-            search: search,
-            clipboard: new FakeClipboardTextReader("sales"),
-            opener: opener,
-            folderExists: path => path == "/sales/current");
-        await viewModel.InitializeAsync();
-
-        var disposition = await viewModel.ActivateFromClipboardAsync();
-
-        Assert.Equal(LauncherActivationDisposition.ShowLauncher, disposition);
-        Assert.Equal(["/sales/current"], opener.OpenedPaths);
-        Assert.Equal("sales", viewModel.Explorer.SearchText);
-        Assert.True(viewModel.Explorer.HasLocalSearchResults);
-        Assert.False(viewModel.CanSearchEverything);
-        Assert.Equal(0, search.SearchCalls);
-        Assert.Contains("失效", viewModel.Status);
-    }
-
-    [Fact]
     public async Task LocalSearchMatch_DoesNotExposeEverythingFallback()
     {
         var configuration = new AppConfiguration();
@@ -235,53 +141,6 @@ public sealed class LauncherViewModelTests
     }
 
     [Fact]
-    public async Task ActivateFromClipboard_ShowsExactMappingAndWaitsForConfirmation()
-    {
-        var configuration = new AppConfiguration();
-        configuration.UpsertMapping("sales", Path.Combine("clients", "Sales Team"));
-        var store = new FakeMappingStore(configuration);
-        var opener = new FakeFolderOpener();
-        var viewModel = CreateViewModel(
-            store,
-            clipboard: new FakeClipboardTextReader(" sales "),
-            opener: opener,
-            folderExists: _ => true);
-        await viewModel.InitializeAsync();
-
-        viewModel.ActivateFromClipboard();
-
-        Assert.Equal(" sales ", viewModel.Alias);
-        Assert.Contains("sales", viewModel.Status, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Sales Team", viewModel.Status);
-        Assert.Contains(Path.Combine("clients", "Sales Team"), viewModel.Status);
-        Assert.Equal(0, opener.OpenCalls);
-        Assert.True(viewModel.CanConfirmOpen);
-        Assert.False(viewModel.IsFolderSearchVisible);
-        Assert.Equal(Path.Combine("clients", "Sales Team"), viewModel.ResolvedPath);
-        Assert.Equal(StatusKind.Success, viewModel.StatusKind);
-    }
-
-    [Fact]
-    public async Task ActivateFromClipboard_StaleMappingExposesEditableAliasAndRealFolderQuery()
-    {
-        var configuration = new AppConfiguration();
-        configuration.UpsertMapping("sales", "/missing-sales");
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(configuration),
-            clipboard: new FakeClipboardTextReader("sales"),
-            folderExists: _ => false);
-        await viewModel.InitializeAsync();
-
-        viewModel.ActivateFromClipboard();
-        Assert.Contains("重新搜索", viewModel.Status);
-        Assert.True(viewModel.IsFolderSearchVisible);
-        viewModel.Alias = "sales-team";
-
-        Assert.Equal("sales-team", viewModel.Alias);
-        Assert.Equal("sales", viewModel.FolderQuery);
-    }
-
-    [Fact]
     public async Task AliasChangeToExactMapping_CancelsSearchAndIgnoresLateResults()
     {
         var configuration = new AppConfiguration();
@@ -309,60 +168,6 @@ public sealed class LauncherViewModelTests
         Assert.Null(viewModel.SelectedResult);
         Assert.Equal(exactStatus, viewModel.Status);
         Assert.True(viewModel.CanConfirmOpen);
-    }
-
-    [Fact]
-    public async Task SameAliasClipboardActivation_InvalidatesPendingSearchResults()
-    {
-        var configuration = new AppConfiguration();
-        configuration.UpsertMapping("sales", "/sales");
-        var search = new DeferredFolderSearch();
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(configuration),
-            search: search,
-            clipboard: new FakeClipboardTextReader("sales"),
-            folderExists: path => path == "/sales",
-            delayAsync: (_, _) => Task.CompletedTask);
-        await viewModel.InitializeAsync();
-        viewModel.Alias = "sales";
-        viewModel.FolderQuery = "manual";
-        var oldRequest = await search.WaitForRequestAsync("manual");
-
-        viewModel.ActivateFromClipboard();
-
-        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
-        Assert.False(viewModel.IsFolderSearchVisible);
-        var exactStatus = viewModel.Status;
-        oldRequest.Complete([new FolderSearchResult("Late", "/late")]);
-        await oldRequest.Completed;
-        await Task.Yield();
-
-        Assert.Empty(viewModel.Results);
-        Assert.Equal(exactStatus, viewModel.Status);
-    }
-
-    [Fact]
-    public async Task ClipboardFailureActivation_StillInvalidatesPendingSearchResults()
-    {
-        var search = new DeferredFolderSearch();
-        var viewModel = CreateViewModel(
-            new FakeMappingStore(new AppConfiguration()),
-            search: search,
-            clipboard: new FakeClipboardTextReader(
-                exception: new InvalidOperationException("clipboard busy")),
-            delayAsync: (_, _) => Task.CompletedTask);
-        await viewModel.InitializeAsync();
-        viewModel.FolderQuery = "old";
-        var oldRequest = await search.WaitForRequestAsync("old");
-
-        viewModel.ActivateFromClipboard();
-
-        Assert.True(oldRequest.CancellationToken.IsCancellationRequested);
-        oldRequest.Complete([new FolderSearchResult("Late", "/late")]);
-        await oldRequest.Completed;
-        await Task.Yield();
-        Assert.Empty(viewModel.Results);
-        Assert.Contains("clipboard busy", viewModel.Status);
     }
 
     [Fact]
@@ -666,35 +471,27 @@ public sealed class LauncherViewModelTests
     }
 
     [Fact]
-    public async Task InitializeAndActivation_ContainStoreAndClipboardExceptionsAsStatus()
+    public async Task InitializeAsync_ContainsStoreExceptionAsStatus()
     {
         var store = new FakeMappingStore(new AppConfiguration())
         {
             LoadException = new IOException("bad config")
         };
-        var viewModel = CreateViewModel(
-            store,
-            clipboard: new FakeClipboardTextReader(
-                exception: new InvalidOperationException("clipboard busy")));
+        var viewModel = CreateViewModel(store);
 
         await viewModel.InitializeAsync();
         Assert.Contains("bad config", viewModel.Status);
-
-        viewModel.ActivateFromClipboard();
-        Assert.Contains("clipboard busy", viewModel.Status);
     }
 
     private static LauncherViewModel CreateViewModel(
         FakeMappingStore store,
         IFolderSearch? search = null,
-        IClipboardTextReader? clipboard = null,
         IFolderOpener? opener = null,
         Func<string, bool>? folderExists = null,
         Func<TimeSpan, CancellationToken, Task>? delayAsync = null) =>
         new(
             store,
             search ?? new FakeFolderSearch(),
-            clipboard ?? new FakeClipboardTextReader(null),
             opener ?? new FakeFolderOpener(),
             folderExists,
             delayAsync);
@@ -814,16 +611,6 @@ public sealed class LauncherViewModelTests
                 _source.TrySetResult(results);
             }
         }
-    }
-
-    private sealed class FakeClipboardTextReader(
-        string? value = null,
-        Exception? exception = null) : IClipboardTextReader
-    {
-        public PlatformOperationResult<string?> ReadText() =>
-            exception is null
-                ? PlatformOperationResult<string?>.Succeeded(value)
-                : throw exception;
     }
 
     private sealed class FakeFolderOpener(

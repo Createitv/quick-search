@@ -1,10 +1,5 @@
 namespace QuickSearch.Core;
 
-public interface IClipboardTextReader
-{
-    PlatformOperationResult<string?> ReadText();
-}
-
 public interface IFolderOpener
 {
     PlatformOperationResult Open(string folderPath);
