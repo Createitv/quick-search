@@ -172,6 +172,60 @@ public sealed class AppConfigurationTests
     }
 
     [Fact]
+    public void AddRule_AllowsTheSameShortcutPathInDifferentNavigationFolders()
+    {
+        var configuration = new AppConfiguration();
+        var today = configuration.AddNavigationFolder("今日", parentId: null);
+        var project = configuration.AddNavigationFolder("项目", parentId: null);
+
+        var todayRule = configuration.AddRule(
+            "10.3米的材料增补",
+            ["10.3米的材料增补"],
+            @"D:\项目\10.3米的材料增补",
+            today.Id);
+        var projectRule = configuration.AddRule(
+            "10.3米的材料增补",
+            ["10.3米的材料增补"],
+            @"d:\项目\10.3米的材料增补",
+            project.Id);
+
+        Assert.NotEqual(todayRule.Id, projectRule.Id);
+        Assert.Equal(2, configuration.Rules.Count);
+        Assert.Contains(configuration.Rules, rule =>
+            rule.Id == todayRule.Id && rule.NavigationFolderId == today.Id);
+        Assert.Contains(configuration.Rules, rule =>
+            rule.Id == projectRule.Id && rule.NavigationFolderId == project.Id);
+    }
+
+    [Fact]
+    public void AddRule_MergesAliasesOnlyWithinTheSameNavigationFolder()
+    {
+        var configuration = new AppConfiguration();
+        var today = configuration.AddNavigationFolder("今日", parentId: null);
+        var project = configuration.AddNavigationFolder("项目", parentId: null);
+        configuration.AddRule(
+            "材料增补",
+            ["today"],
+            @"D:\项目\材料增补",
+            today.Id);
+
+        var projectRule = configuration.AddRule(
+            "材料增补",
+            ["project"],
+            @"D:\项目\材料增补",
+            project.Id);
+        var merged = configuration.AddRule(
+            "",
+            ["PROJECT-2"],
+            @"d:\项目\材料增补",
+            project.Id);
+
+        Assert.Equal(projectRule.Id, merged.Id);
+        Assert.Equal(2, configuration.Rules.Count);
+        Assert.Equal(["project", "PROJECT-2"], merged.Aliases);
+    }
+
+    [Fact]
     public void DirectConstruction_PreservesDifferentFoldersForSameNormalizedKeyword()
     {
         var configuration = new AppConfiguration

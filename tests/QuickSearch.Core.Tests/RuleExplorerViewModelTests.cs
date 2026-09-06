@@ -382,6 +382,38 @@ public sealed class RuleExplorerViewModelTests
     }
 
     [Fact]
+    public async Task CreateRuleAsync_AllowsSameShortcutPathInAnotherFolder()
+    {
+        var configuration = CreateConfiguration();
+        var store = new RecordingMappingStore(configuration);
+        var viewModel = new RuleExplorerViewModel(
+            configuration,
+            store,
+            new RecordingFolderOpener());
+        var today = configuration.AddNavigationFolder("今日", parentId: null);
+        var project = configuration.AddNavigationFolder("项目", parentId: null);
+        var original = configuration.AddRule(
+            "10.3米的材料增补",
+            ["10.3米的材料增补"],
+            @"D:\材料\10.3米的材料增补",
+            today.Id);
+        viewModel.NavigateToFolder(project.Id);
+
+        var created = await viewModel.CreateRuleAsync(
+            project.Id,
+            "10.3米的材料增补",
+            ["10.3米的材料增补"],
+            @"d:\材料\10.3米的材料增补");
+
+        Assert.NotNull(created);
+        Assert.NotEqual(original.Id, created.Id);
+        Assert.Equal(today.Id, configuration.Rules.Single(rule => rule.Id == original.Id).NavigationFolderId);
+        Assert.Equal(project.Id, configuration.Rules.Single(rule => rule.Id == created.Id).NavigationFolderId);
+        Assert.Equal(created.Id, Assert.Single(viewModel.CurrentRules).Id);
+        Assert.Single(store.SavedConfigurations);
+    }
+
+    [Fact]
     public async Task CreateRuleAsync_WhenSaveFails_DoesNotChangeLiveRules()
     {
         var configuration = CreateConfiguration();

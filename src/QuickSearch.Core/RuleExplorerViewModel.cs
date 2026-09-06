@@ -479,7 +479,7 @@ public sealed class RuleExplorerViewModel : ObservableObject
         }
 
         var candidate = _configuration.Clone();
-        candidate.MarkMappingUsed(rule.Aliases[0], rule.FolderPath);
+        candidate.MarkRuleUsed(rule.Id);
         try
         {
             await _store.SaveAsync(candidate);

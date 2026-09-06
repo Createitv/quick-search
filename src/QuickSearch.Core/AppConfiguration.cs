@@ -228,7 +228,7 @@ public sealed class AppConfiguration
         ValidateFolderExists(folderId);
         var path = ValidatePath(folderPath);
         var normalizedAliases = NormalizeAliases(aliases);
-        var existingIndex = FindRuleIndexByPath(path);
+        var existingIndex = FindRuleIndexByPath(path, folderId);
         if (existingIndex >= 0)
         {
             var existing = _rules[existingIndex];
@@ -270,7 +270,7 @@ public sealed class AppConfiguration
         ValidateFolderExists(folderId);
         var index = GetRuleIndex(ruleId);
         var path = ValidatePath(folderPath);
-        var conflictingIndex = FindRuleIndexByPath(path);
+        var conflictingIndex = FindRuleIndexByPath(path, folderId);
         if (conflictingIndex >= 0 && conflictingIndex != index)
         {
             throw new InvalidOperationException($"文件夹路径已存在规则：{path}");
@@ -312,6 +312,14 @@ public sealed class AppConfiguration
         _rules[index] = moved;
         NormalizeRuleOrder(sourceFolderId);
         return moved;
+    }
+
+    public FolderRule MarkRuleUsed(Guid ruleId)
+    {
+        var index = GetRuleIndex(ruleId);
+        var updated = _rules[index] with { LastUsedAtUtc = UtcNow() };
+        _rules[index] = updated;
+        return updated;
     }
 
     public FolderRule ReorderRuleRelative(
@@ -467,8 +475,8 @@ public sealed class AppConfiguration
 
     public FolderMapping? MarkMappingUsed(string alias, string folderPath)
     {
-        var index = FindRuleIndexByPath(folderPath);
-        if (index < 0 || !_rules[index].MatchesAlias(alias))
+        var index = FindRuleIndexByPathAndAlias(folderPath, alias);
+        if (index < 0)
         {
             return null;
         }
@@ -498,8 +506,16 @@ public sealed class AppConfiguration
 
     public bool RemoveMapping(string alias, string folderPath)
     {
-        var index = FindRuleIndexByPath(folderPath);
-        return index >= 0 && RemoveAliasFromRule(_rules[index].Id, alias);
+        var removed = false;
+        foreach (var rule in FindRulesByPath(folderPath).ToArray())
+        {
+            if (RemoveAliasFromRule(rule.Id, alias))
+            {
+                removed = true;
+            }
+        }
+
+        return removed;
     }
 
     public FolderMapping UpdateMapping(
@@ -519,8 +535,8 @@ public sealed class AppConfiguration
         string alias,
         string folderPath)
     {
-        var originalIndex = FindRuleIndexByPath(originalFolderPath);
-        if (originalIndex < 0 || !_rules[originalIndex].MatchesAlias(originalAlias))
+        var originalIndex = FindRuleIndexByPathAndAlias(originalFolderPath, originalAlias);
+        if (originalIndex < 0)
         {
             return AddMapping(alias, folderPath);
         }
@@ -544,14 +560,9 @@ public sealed class AppConfiguration
     public IReadOnlyList<FolderMapping> GetMappingsForPath(string folderPath)
     {
         ArgumentNullException.ThrowIfNull(folderPath);
-        var index = FindRuleIndexByPath(folderPath);
-        if (index < 0)
-        {
-            return [];
-        }
-
-        var rule = _rules[index];
-        return rule.Aliases.Select(alias => CreateMapping(rule, alias)).ToArray();
+        return FindRulesByPath(folderPath)
+            .SelectMany(rule => rule.Aliases.Select(alias => CreateMapping(rule, alias)))
+            .ToArray();
     }
 
     public AppConfiguration Clone() => new(_timeProvider)
@@ -612,7 +623,7 @@ public sealed class AppConfiguration
         ValidateFolderExists(rule.NavigationFolderId);
         var path = ValidatePath(rule.FolderPath);
         var aliases = NormalizeAliases(rule.Aliases);
-        if (FindRuleIndexByPath(path) >= 0)
+        if (FindRuleIndexByPath(path, rule.NavigationFolderId) >= 0)
         {
             throw new InvalidOperationException($"文件夹路径已存在规则：{path}");
         }
@@ -772,7 +783,21 @@ public sealed class AppConfiguration
             : throw new InvalidOperationException("规则不存在。");
     }
 
-    private int FindRuleIndexByPath(string folderPath) => _rules.FindIndex(rule =>
+    private int FindRuleIndexByPath(string folderPath, Guid? navigationFolderId = null) => _rules.FindIndex(rule =>
+        (navigationFolderId is null || rule.NavigationFolderId == navigationFolderId.Value)
+        && string.Equals(
+            rule.FolderPath.Trim(),
+            folderPath.Trim(),
+            StringComparison.OrdinalIgnoreCase));
+
+    private int FindRuleIndexByPathAndAlias(string folderPath, string alias) => _rules.FindIndex(rule =>
+        string.Equals(
+            rule.FolderPath.Trim(),
+            folderPath.Trim(),
+            StringComparison.OrdinalIgnoreCase)
+        && rule.MatchesAlias(alias));
+
+    private IEnumerable<FolderRule> FindRulesByPath(string folderPath) => _rules.Where(rule =>
         string.Equals(
             rule.FolderPath.Trim(),
             folderPath.Trim(),
